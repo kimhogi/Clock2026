@@ -1,0 +1,308 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="추가소스">
+      <UniqueIdentifier>{04cd17d7-91c3-456d-b116-75519eba5bfd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\Data">
+      <UniqueIdentifier>{b3c62475-4046-476f-afed-2ed4e7d79c90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\EtcCtrl">
+      <UniqueIdentifier>{6904081b-fe40-45dd-8406-36345624701b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\HDdaVinci">
+      <UniqueIdentifier>{36d5a136-ab1f-4df3-ac29-528449f88241}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\ImageProcessor">
+      <UniqueIdentifier>{303d309a-c70d-4a71-8ff9-a83a73231d29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\Spread">
+      <UniqueIdentifier>{bc3a8866-916b-486c-9854-048ed7e5e80e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Spread">
+      <UniqueIdentifier>{bfcf9bc0-f86d-46fa-b7d4-042073b57cbe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Spread">
+      <UniqueIdentifier>{44875cc7-533e-44b2-a3f2-ef05e6cebf3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="추가소스\LiveVideo">
+      <UniqueIdentifier>{62f95d56-0cb3-4ad9-a41e-f9d66e7529c0}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Clock2023.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="framework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ClockData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SocMFC.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NewsSpread.h">
+      <Filter>Header Files\Spread</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageConfigDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpellCheck.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpellingCheckDll.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WeatherSelectDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WeatherSpread.h">
+      <Filter>Header Files\Spread</Filter>
+    </ClInclude>
+    <ClInclude Include="Sntp.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AliasSpread.h">
+      <Filter>Header Files\Spread</Filter>
+    </ClInclude>
+    <ClInclude Include="NoticeSpread.h">
+      <Filter>Header Files\Spread</Filter>
+    </ClInclude>
+    <ClInclude Include="Clock2023Dlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InputDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Clock2023.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Clock2023Dlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\Data\Guid.cpp">
+      <Filter>추가소스\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\Data\sData\SQLite\CppSQLite3.cpp">
+      <Filter>추가소스\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\Data\FileUtils.cpp">
+      <Filter>추가소스\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\Data\sData\sData.cpp">
+      <Filter>추가소스\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\Spread80\include\Ssdllmfc.cpp">
+      <Filter>추가소스\Spread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\BtnST.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\Common.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\DIB.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\dxutil.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\exlusion.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\FontComboBox.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\ProgressWnd.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\ScrollHelper.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\Timedmsgbox.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\EtcCtrl\XStatusBar.cpp">
+      <Filter>추가소스\EtcCtrl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\HDdaVinci\VS_2017\HDdaVinci.cpp">
+      <Filter>추가소스\HDdaVinci</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\HDdaVinci\VS_2017\SuperInOutButton.cpp">
+      <Filter>추가소스\HDdaVinci</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\CGAlphaMixer.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\CGImageFile.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\CGImageProcessor.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ColorPickerDlg.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ColourPickerXP.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ImageImportDlg.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ImagePreviewStatic.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ImageStatic.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\PreviewFileDialog.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\PreviewStatic.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\Targa.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\CPXFilePath.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\XPTheme.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="ClockData.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SocMFC.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NewsSpread.cpp">
+      <Filter>Source Files\Spread</Filter>
+    </ClCompile>
+    <ClCompile Include="RichEditCtrlEx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageDataObject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ImageConfigDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\ImageProcessor\ImageButton.cpp">
+      <Filter>추가소스\ImageProcessor</Filter>
+    </ClCompile>
+    <ClCompile Include="SpellCheck.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SpellingCheckDll.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WeatherSelectDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WeatherSpread.cpp">
+      <Filter>Source Files\Spread</Filter>
+    </ClCompile>
+    <ClCompile Include="Sntp.cpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AliasSpread.cpp">
+      <Filter>Source Files\Spread</Filter>
+    </ClCompile>
+    <ClCompile Include="NoticeSpread.cpp">
+      <Filter>Source Files\Spread</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\Bgra32VideoFrame.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\CLiveVideo.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\ImageWriterWin.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\platform.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\PreviewWindow.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\Resizer.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\ScreenGrab.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\WICTextureLoader.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\DeckLinkDevice.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Include_2021\LiveVideoInput\DeckLinkDeviceDiscovery.cpp">
+      <Filter>추가소스\LiveVideo</Filter>
+    </ClCompile>
+    <ClCompile Include="InputDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Clock2023.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\Clock2023.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\Clock2023.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\PreviewButton.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\CCHSB.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\ccrgb.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="res\Question.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="..\..\Include_2021\LiveVideoInput\include\DeckLinkAPI.idl">
+      <Filter>추가소스\LiveVideo</Filter>
+    </Midl>
+  </ItemGroup>
+</Project>
