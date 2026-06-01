@@ -42,7 +42,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Clock2023.h">
+    <ClInclude Include="Clock2026.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="framework.h">
@@ -51,7 +51,7 @@
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Resource.h">
+    <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
@@ -90,18 +90,21 @@
     <ClInclude Include="NoticeSpread.h">
       <Filter>Header Files\Spread</Filter>
     </ClInclude>
-    <ClInclude Include="Clock2023Dlg.h">
+    <ClInclude Include="Clock2026Dlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="InputDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ClockDataTests\pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Clock2023.cpp">
+    <ClCompile Include="Clock2026.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Clock2023Dlg.cpp">
+    <ClCompile Include="Clock2026Dlg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
@@ -272,19 +275,32 @@
     <ClCompile Include="InputDlg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ClockDataTests\pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ClockDataTests\TestStubs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ClockDataTests\ClockDataImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ClockDataTests\ClockDataTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Clock2023.rc">
+    <ResourceCompile Include="Clock2026.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\Clock2023.rc2">
+    <None Include="res\Clock2026.rc2">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="ClockDataTests\ClockDataTests.vcxproj" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\Clock2023.ico">
+    <Image Include="res\Clock2026.ico">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="res\PreviewButton.bmp">

@@ -1,34 +1,34 @@
-// Clock2023.cpp : Defines the class behaviors for the application.
+// Clock2026.cpp : Defines the class behaviors for the application.
 //
 
 #include "pch.h"
 #include "framework.h"
-#include "Clock2023.h"
-#include "Clock2023Dlg.h"
+#include "Clock2026.h"
+#include "Clock2026Dlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
-// CClock2023App
+// CClock2026App
 
-BEGIN_MESSAGE_MAP(CClock2023App, CWinApp)
+BEGIN_MESSAGE_MAP(CClock2026App, CWinApp)
 	ON_COMMAND(ID_HELP, &CWinApp::OnHelp)
 END_MESSAGE_MAP()
 
-// CClock2023App construction
+// CClock2026App construction
 
-CClock2023App::CClock2023App()
+CClock2026App::CClock2026App()
 {
 	// TODO: add construction code here,
 	// Place all significant initialization in InitInstance
 }
 
-// The one and only CClock2023App object
+// The one and only CClock2026App object
 
-CClock2023App theApp;
+CClock2026App theApp;
 
-BOOL CALLBACK CClock2023App::searcher(HWND hWnd, LPARAM lParam)
+BOOL CALLBACK CClock2026App::searcher(HWND hWnd, LPARAM lParam)
 {
 	DWORD_PTR result;
 
@@ -49,16 +49,22 @@ BOOL CALLBACK CClock2023App::searcher(HWND hWnd, LPARAM lParam)
 	return TRUE; // continue search
 }
 
-// CClock2023App initialization
+// CClock2026App initialization
 
-BOOL CClock2023App::InitInstance()
+BOOL CClock2026App::InitInstance()
 {
-	/// ////////////////////////////////////////////////////////////////
-	HRESULT	result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);   // ADDED
-	if (FAILED(result))
+
+	if (!AfxOleInit())
 	{
-		::AfxMessageBox(_T("CoInitializeEx Fail !!!"));
+		AfxMessageBox(_T("AfxOleInit failed"));
+		return FALSE;
 	}
+	/// ////////////////////////////////////////////////////////////////
+	//HRESULT	result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);   // ADDED
+	//if (FAILED(result))
+	//{
+	//	::AfxMessageBox(_T("CoInitializeEx Fail !!!"));
+	//}
 	////////////////////////////////////////////////////////////////////
 
 	BOOL bAlreadyRunning;
@@ -123,11 +129,17 @@ BOOL CClock2023App::InitInstance()
 #ifdef _UHD_
 	m_pHDdaVinci = new CHDdaVinci(3);  // UHD ÇØ»óµµ
 #else
+
+
 	CCGXFrameworkEdit::_useQuicktime = 0;
 	m_pHDdaVinci = new CHDdaVinci;
-#endif
+
+
 
 	m_pStatus = new CStatus();
+
+#endif
+
 
 	// Create the shell manager, in case the dialog contains
 	// any shell tree view or shell list view controls.
@@ -144,13 +156,13 @@ BOOL CClock2023App::InitInstance()
 	// TODO: You should modify this string to be something appropriate
 	// such as the name of your company or organization
 	SetRegistryKey(_T("KBS MPT 2025"));
-
-	CClock2023Dlg dlg;
 	
+	CClock2026Dlg dlg;
+
 	m_pMainWnd = &dlg;
-
+	
 	LoadSetting();
-
+		
 	INT_PTR nResponse = dlg.DoModal();
 
 	if (nResponse == IDOK)
@@ -184,7 +196,7 @@ BOOL CClock2023App::InitInstance()
 	return FALSE;
 }
 
-int CClock2023App::ExitInstance()
+int CClock2026App::ExitInstance()
 {
 	SAFE_DELETE(m_pStatus);
 	SAFE_DELETE(m_pHDdaVinci);
@@ -194,14 +206,15 @@ int CClock2023App::ExitInstance()
 	return CWinApp::ExitInstance();
 }
 
-void CClock2023App::LoadSetting(void)
+void CClock2026App::LoadSetting(void)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(m_pMainWnd);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(m_pMainWnd);
 
 	m_pStatus->m_strFileName = GetProfileString(_T("File"), _T("FileName"), m_pStatus->m_strFileName);
 	m_pStatus->m_strFPRFileName = GetProfileString(_T("File"), _T("FPRFileName"), m_pStatus->m_strFPRFileName);
 	m_pStatus->NewsConf()->SymbolFont(GetProfileString(_T("Symbol"), _T("Font"), m_pStatus->NewsConf()->SymbolFont()));
 	m_pStatus->NewsConf()->SymbolSize(GetProfileString(_T("Symbol"), _T("Size"), m_pStatus->NewsConf()->SymbolSize()));
+	m_pStatus->WeatherConf()->ExceptAir(GetProfileInt(_T("Weather"), _T("ExceptAir"), m_pStatus->WeatherConf()->ExceptAir()));
 
 
 	CString strTemplate;
@@ -212,15 +225,16 @@ void CClock2023App::LoadSetting(void)
 
 }
 
-void CClock2023App::SaveSetting(void)
+void CClock2026App::SaveSetting(void)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(m_pMainWnd);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(m_pMainWnd);
 
 	WriteProfileString(_T("File"), _T("FileName"), m_pStatus->m_strFileName);
 	WriteProfileString(_T("File"), _T("FPRFileName"), m_pStatus->m_strFPRFileName);
 	WriteProfileString(_T("File"), _T("LiveVideoTemplate"), m_pStatus->LiveVideoConf()->Template());
 	WriteProfileString(_T("Symbol"), _T("Font"), m_pStatus->NewsConf()->SymbolFont());
 	WriteProfileString(_T("Symbol"), _T("Size"), m_pStatus->NewsConf()->SymbolSize());
+	WriteProfileInt(_T("Weather"), _T("ExceptAir"), m_pStatus->WeatherConf()->ExceptAir());
 }
 
 CString GetDataDir() { return CFileUtils::GetBaseDir() + TEXT("Data/"); }

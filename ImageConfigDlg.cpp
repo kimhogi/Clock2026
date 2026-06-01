@@ -2,7 +2,7 @@
 //
 
 #include "pch.h"
-#include "Clock2023.h"
+#include "Clock2026.h"
 #include "ImageConfigDlg.h"
 #include ".\imageconfigdlg.h"
 

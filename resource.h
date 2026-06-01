@@ -1,11 +1,11 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by Clock2023.rc
+// Used by Clock2026.rc
 //
 #define IDM_ABOUTBOX                    0x0010
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
-#define IDD_CLOCK2023_DIALOG            102
+#define IDD_CLOCK2026_DIALOG            102
 #define IDR_BROWSERVIEW                 102
 #define IDD_FILE_IMAGE                  103
 #define IDS_PROGRESS_TEXT               103
@@ -72,8 +72,8 @@
 #define IDC_BUTTON_EXP_WEATHER          1043
 #define IDC_BUTTON_WEATHER_MOVE_DOWN    1044
 #define IDC_CHECK_SUWON_SI              1045
-#define IDC_BUTTON_RECENT_SAVE          1045
-#define IDC_BUTTON_IMP_WEATHER          1045
+#define IDC_BUTTON_RECENT_SAVE          1637
+#define IDC_BUTTON_IMP_WEATHER          1638
 #define IDC_CHECK_SEONGNAM_SI           1046
 #define IDC_CHECK_BUCHEON_SI            1047
 #define IDC_CHECK_ANYANG_SI             1048
@@ -349,7 +349,7 @@
 #define IDC_EDIT_LOGO_MOVE_SIZE         1396
 #define IDC_BUTTON_WEATHER_MOVE_UP      1397
 #define IDC_EDIT_WEATHER_TIME           1398
-#define IDC_EDIT_WEATHER_DISPLAY_DURATION 1398
+#define IDC_EDIT_WEATHER_DISPLAY_DURATION 1639
 #define IDC_RADIO_LOGO_KBS1             1399
 #define IDC_RADIO_LOGO_KBS2             1400
 #define IDC_RADIO_LOGO_KBS_LOCAL        1401
@@ -392,7 +392,7 @@
 #define IDC_BUTTON_BIG_CLOCK_RESET_POS  1445
 #define IDC_EDIT_BIG_CLOCK_MOVE_SIZE    1446
 #define IDC_EDIT_NEWS_TIME              1447
-#define IDC_EDIT_NEWS_DISPLAY_DURATION  1447
+#define IDC_EDIT_NEWS_DISPLAY_DURATION  1640
 #define IDC_BUTTON_NEWS_TEXT_COLOR      1448
 #define IDC_COMBO_NEWS_TEXT_FONT        1449
 #define IDC_COMBO_NEWS_TEXT_SIZE        1450
@@ -577,8 +577,9 @@
 #define IDC_BUTTON_DATE_FORMAT          1632
 #define IDC_BUTTON1                     1633
 #define IDC_EDIT_MIR_ACT1               1634
-#define IDC_EDIT_MIRACT2                1635
 #define IDC_EDIT_MIR_ACT2               1635
+#define IDC_CHECK1                      1636
+#define IDC_CHECK_EXCEPT_AIR            1636
 #define ID_FILES_SAVE                   32774
 #define ID_FILES_OPEN                   32775
 #define ID_FILES_EXIT                   32777
@@ -623,7 +624,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        153
 #define _APS_NEXT_COMMAND_VALUE         32812
-#define _APS_NEXT_CONTROL_VALUE         1635
+#define _APS_NEXT_CONTROL_VALUE         1641
 #define _APS_NEXT_SYMED_VALUE           104
 #endif
 #endif

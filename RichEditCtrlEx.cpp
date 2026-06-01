@@ -56,7 +56,7 @@ BOOL CRichEditCtrlEx::PreTranslateMessage(MSG* pMsg)
 	{
 	//	if (m_bXMLEdit )
 		{
-			UINT nKeyCode = pMsg->wParam;	// virtual key code of the key pressed
+			UINT nKeyCode = static_cast<UINT>(pMsg->wParam);	// virtual key code of the key pressed
 			if ((nKeyCode == _T('V')) && (::GetKeyState(VK_CONTROL) & 0x8000) )
 			{			
 
@@ -378,7 +378,7 @@ CString CRichEditCtrlEx::GetUnicodeString(void)
 	getTextLengthEx.codepage=1200;
 	getTextLengthEx.flags=GTL_DEFAULT;
 
-	int nLength = this->SendMessage(EM_GETTEXTLENGTHEX, (WPARAM)&getTextLengthEx, (LPARAM)0); //edit->GetTextLengthEx(GTL_DEFAULT,1200); 
+	int nLength = static_cast<int>(this->SendMessage(EM_GETTEXTLENGTHEX, (WPARAM)&getTextLengthEx, (LPARAM)0)); //edit->GetTextLengthEx(GTL_DEFAULT,1200);
 	LPWSTR lpszWChar = new WCHAR[nLength+1];
 
 	GETTEXTEX getTextEx;
@@ -864,7 +864,7 @@ void CRichEditCtrlEx::InsertImgToRichEditCtrl(CString strFilename,INT nSize)
 		int nWidth = cxImage.GetWidth();
 		int nHeight = cxImage.GetHeight();
 		int nEditImageSize = static_cast<int>(nSize*0.4f);
-		cxImage.Resample(nEditImageSize * float(nWidth) / float(nHeight), nEditImageSize);
+		cxImage.Resample(static_cast<int>(nEditImageSize * float(nWidth) / float(nHeight)), nEditImageSize);
 
 		// 이부분에 있어서두 소스 수정이 불가피하다.
 

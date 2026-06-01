@@ -1,5 +1,5 @@
 
-// Clock2023.h : main header file for the PROJECT_NAME application
+// Clock2026.h : main header file for the PROJECT_NAME application
 //
 
 #pragma once
@@ -12,14 +12,14 @@
 #include "ClockData.h"
 
 
-// CClock2023App:
-// See Clock2023.cpp for the implementation of this class
+// CClock2026App:
+// See Clock2026.cpp for the implementation of this class
 //
 
-class CClock2023App : public CWinApp
+class CClock2026App : public CWinApp
 {
 public:
-	CClock2023App();
+	CClock2026App();
 
 private:
 	HINSTANCE m_hInstAdvancedEdit;
@@ -44,7 +44,7 @@ public:
 	DECLARE_MESSAGE_MAP()
 };
 
-extern CClock2023App theApp;
+extern CClock2026App theApp;
 
 
 extern CString GetDataDir(); 

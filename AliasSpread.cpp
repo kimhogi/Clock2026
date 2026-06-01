@@ -18,13 +18,22 @@ void CAliasSpread::OnSetUp(CNoticeData& noticeData,BOOL bGetAlias)
 
 	SetTypeStaticText(&m_readOnlyCellType, SS_TEXT_WORDWRAP | SS_TEXT_VCENTER | SS_TEXT_CENTER);
 
-	if (bGetAlias)
+	CString strFpg = noticeData.GetValue(NOTICE_FIELD_INDEX::TEMPLATE);
+
+	if (!CFileUtils::ExistFile(strFpg))
 	{
-		m_nRows = noticeData.GetAliases(m_pHDdaVinci);
+		m_nRows = 0;
 	}
 	else
 	{
-		m_nRows = noticeData.CountAlias();
+		if (bGetAlias)
+		{
+			m_nRows = noticeData.GetAliases(m_pHDdaVinci);
+		}
+		else
+		{
+			m_nRows = noticeData.CountAlias();
+		}
 	}
 
 	SetMaxCols(COL_TYPE);
@@ -35,7 +44,7 @@ void CAliasSpread::OnSetUp(CNoticeData& noticeData,BOOL bGetAlias)
 	SetFonts();
 
 	SetOperationMode(SS_OP_MODE_NORMAL);
-	
+
 }
 
 void CAliasSpread::SetColumnsHeaderText(void)
@@ -126,7 +135,7 @@ void CAliasSpread::LoadImageResource(INT nIndex)
 	TCHAR szCurrentDirectory[MAX_PATH];
 	::GetCurrentDirectory(MAX_PATH, szCurrentDirectory);
 
-	CImageImportDlg  dlg(TRUE);
+	CImageImportDlg dlg(TRUE);
 	dlg.m_pOFN->lpstrFilter =  _T("All Format (*.tga *.png *.ccs)\0*.tga;*.png;*.ccs\0TGA Format (*.tga)\0*.tga\0PNG Format (*.png)\0*.png\0CCS Format (*.ccs)\0*.ccs\0All Formats (*.*)\0*.*\0\0");
 
 	if (dlg.DoModal() == IDOK)

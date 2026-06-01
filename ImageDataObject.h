@@ -40,7 +40,7 @@ struct STG_PATH{
 			strPath = rhs.strPath;
 		}
 	}
-	bool operator==( const STG_PATH& rhs)
+	bool operator==(const STG_PATH& rhs) const
 	{
 		if( this != &rhs)
 		{

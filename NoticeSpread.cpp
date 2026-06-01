@@ -114,7 +114,7 @@ LRESULT CNoticeSpread::EditModeOff(WPARAM wParam, LPARAM lParam) {
 
 	if (pList == nullptr) return 0;
 
-	CNoticeData& Object = pList->GetAt(nRow - 1);
+	auto Object = pList->GetAt(nRow - 1);
 	
 	if (nCol == NOTICE_FIELD_INDEX::ANNOTATION + 1 || nCol == NOTICE_FIELD_INDEX::USE + 1)
 	{
@@ -206,7 +206,13 @@ LRESULT CNoticeSpread::LButtonClicked(CNoticeData& Object, WPARAM wParam, LPARAM
 		strFpgName = Object.GetValue(NOTICE_FIELD_INDEX::TEMPLATE);
 		if (!CFileUtils::ExistFile(strFpgName) && strFpgName != BLANK_STRING)
 		{
-			AfxMessageBox(strFpgName + _T("존재하지 않습니다."));
+			INT nResult = AfxMessageBox(strFpgName + _T("존재하지 않습니다. 삭제하시겠습니까? "), MB_YESNO);
+
+			if (nResult == IDYES)
+			{
+				pList->DeleteData(Object);
+				UpdateCurrentSheet(FALSE);
+			}
 		}
 
 		DrawSelection(nRow, -1);
@@ -234,7 +240,7 @@ LRESULT CNoticeSpread::templateChange(WPARAM wParam, LPARAM lParam)
 
 	if (pList == nullptr) return 0;
 
-	CNoticeData& Object = pList->GetAt(nDataIndex);
+	auto Object = pList->GetAt(nDataIndex);
 
 	if (!Object.IsValid())
 	{
@@ -282,7 +288,7 @@ LRESULT CNoticeSpread::CheckBoxChange(WPARAM wParam, LPARAM lParam)
 
 	if (pList == nullptr) return 0;
 
-	CNoticeData& Object = pList->GetAt(nDataIndex);
+	auto Object = pList->GetAt(nDataIndex);
 
 	if (!Object.IsValid())
 	{
@@ -395,7 +401,7 @@ BOOL CNoticeSpread::UpdateRow(int nSheetIndex, SS_COORD nRow, BOOL bSaveAndValid
 
 	int nFieldsCount = fields.GetFieldsCount();
 
-	CNoticeData& Object = pList->GetAt(nDataIndex);
+	auto Object = pList->GetAt(nDataIndex);
 
 	if (bSaveAndValidate)
 	{
@@ -471,7 +477,7 @@ BOOL CNoticeSpread::UpdateDataSheet(int nSheetIndex, BOOL bSaveAndValidate, BOOL
 			nRow++;
 		}
 
-		SetSheetName(nSheetIndex, pList->GetTypeName() + GETSTR(nSheetIndex));
+		SetSheetName(static_cast<short>(nSheetIndex), pList->GetTypeName() + GETSTR(nSheetIndex));
 	}
 	else
 	{

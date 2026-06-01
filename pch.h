@@ -7,6 +7,9 @@
 #ifndef PCH_H
 #define PCH_H
 
+#define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+#define NOMINMAX
+
 // add headers that you want to pre-compile here
 #include "framework.h"
 

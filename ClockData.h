@@ -22,7 +22,7 @@ extern CString GetWeatherIconsDir();
 using namespace JSONPP;
 using namespace libxl;
 
-#define WAIT_TIME_FOR_WEATHER_READING 50000
+#define WAIT_TIME_FOR_WEATHER_READING 5000
 
 
 constexpr auto WM_DISP_CHECK = (WM_APP + 400);
@@ -1243,13 +1243,56 @@ public:
 		CharSet(129);	
 	}
 
-	CCharInfo(const CCharInfo& rhs)
+	// 복사 생성자 (Copy constructor)
+	CCharInfo(const CCharInfo& rhs) noexcept
+		: CClockDataObject(rhs)  // 부모 클래스 복사 생성자 호출
+		, m_strChar(rhs.m_strChar)
+		, m_nSize(rhs.m_nSize)
+		, m_ulColor(rhs.m_ulColor)
+		, m_strFont(rhs.m_strFont)
+		, m_btCharSet(rhs.m_btCharSet)
 	{
-		Char(rhs.Char());
-		Size(rhs.Size());
-		Color(rhs.Color());
-		Font(rhs.Font());
-		CharSet(rhs.CharSet());
+	}
+
+	// 이동 생성자 (Move constructor)
+	CCharInfo(CCharInfo&& rhs) noexcept
+		: CClockDataObject(std::move(rhs))  // 부모 클래스 이동 생성자 호출
+		, m_strChar(std::move(rhs.m_strChar))
+		, m_nSize(rhs.m_nSize)
+		, m_ulColor(rhs.m_ulColor)
+		, m_strFont(std::move(rhs.m_strFont))
+		, m_btCharSet(rhs.m_btCharSet)
+	{
+	}
+
+	// 복사 대입 연산자 (Copy assignment operator)
+	CCharInfo& operator=(const CCharInfo& rhs) noexcept
+	{
+		if (this != &rhs)
+		{
+			CClockDataObject::operator=(rhs);  // 부모 클래스 복사 대입 연산자 호출
+			m_strChar = rhs.m_strChar;
+			m_nSize = rhs.m_nSize;
+			m_ulColor = rhs.m_ulColor;
+			m_strFont = rhs.m_strFont;
+			m_btCharSet = rhs.m_btCharSet;
+		}
+		return *this;
+	}
+
+	// 이동 대입 연산자 (Move assignment operator)
+	CCharInfo& operator=(CCharInfo&& rhs) noexcept
+	{
+		if (this != &rhs)
+		{
+			CClockDataObject::operator=(std::move(rhs));  // 부모 클래스 이동 대입 연산자 호출
+			m_strChar = std::move(rhs.m_strChar);
+			m_nSize = rhs.m_nSize;
+			m_ulColor = rhs.m_ulColor;
+			m_strFont = std::move(rhs.m_strFont);
+			m_btCharSet = rhs.m_btCharSet;
+		}
+		return *this;
 	}
 
 	CCharInfo(const CString& strData)
@@ -1278,10 +1321,21 @@ public:
 		CharSet(static_cast<BYTE>(GETINT(strCharSet)));
 	}
 
+
 	CCharInfo(CString& strContents, ULONG ulColor, CString& strFontName)
 	{
 		Char(strContents);
 		Size(100);
+		Color(ulColor);
+		Font(strFontName);
+		CharSet(129);
+	}
+
+
+	CCharInfo(CString& strContents, INT nSize, ULONG ulColor, CString& strFontName)
+	{
+		Char(strContents);
+		Size(nSize);
 		Color(ulColor);
 		Font(strFontName);
 		CharSet(129);
@@ -1364,7 +1418,7 @@ public:
 		CharSet(129);
 	}
 
-	CCharInfo& operator= (CCharInfo& rhs)
+	CCharInfo& operator=(CCharInfo& rhs)
 	{
 		Char(rhs.Char());
 		Size(rhs.Size());
@@ -1374,6 +1428,8 @@ public:
 
 		return *this;
 	}
+
+
 
 	const BOOL operator== (const CCharInfo& rhs)
 	{
@@ -1413,7 +1469,8 @@ public:
 
 	void SetCharInfoFromString(CString strData)
 	{
-		*this = CCharInfo(strData);
+		CCharInfo ci(strData);
+		*this = ci;
 	}
 
 #ifdef DEBUG
@@ -1443,9 +1500,10 @@ public:
 	CCharInfoList(vector<CString> vecData)
 	{
 		m_CharInfoList.clear();
-		for each (CString strData in vecData)
+		for(auto& strData : vecData)
 		{
-			m_CharInfoList.emplace_back(CCharInfo(strData));
+			CCharInfo ci(strData);
+			m_CharInfoList.emplace_back(ci);
 		}
 
 	}
@@ -1589,8 +1647,105 @@ public:
 
 	}
 
-	void ExtractTextFormat(void)
+	BOOL MakeCharInfoListFromTextFormat(void)  // 만들기는 했는데 크게 의미가 없을 것 같음
 	{
+		BOOL bResult = FALSE;
+
+		m_CharInfoList.clear();
+
+		INT nSize = m_vstrContents.size();
+
+		for (INT i = 0; i < nSize; i++)
+		{
+			INT nContentsIndex = min(i, m_vstrContents.size() - 1);
+			INT nSizesIndex =  min(i, m_vnSizes.size() - 1);
+			INT nColorsIndex = min(i, m_vulColors.size() - 1);
+			INT nFontsIndex = min(i, m_vstrFonts.size() - 1);
+
+			CString strContent = m_vstrContents.at(nContentsIndex);
+			INT nCharSize = m_vnSizes.at(nSizesIndex);
+			ULONG ulColor = m_vulColors.at(nColorsIndex);
+			CString strFont = m_vstrFonts.at(nFontsIndex);
+			
+			CCharInfo ci(strContent, nCharSize, ulColor, strFont);
+	
+			m_CharInfoList.emplace_back(ci);
+		}
+
+		return TRUE;
+	}
+
+
+	BOOL FixedTextFormatFromCharInfoList(void)  // 만들기는 했는데 크게 의미가 없을 것 같음
+	{
+		BOOL bFixed = FALSE;
+
+		CCharInfo charInfo;
+
+		int nSize = static_cast<int>(m_CharInfoList.size());
+
+		m_vstrContents.clear();
+		m_vstrFonts.clear();
+		m_vulColors.clear();
+		m_vnSizes.clear();
+
+		for (int i = 0; i < nSize; ++i)
+		{
+			charInfo = GetAt(i);
+
+			INT nCount = charInfo.Char().GetLength();
+
+			if (nCount > 1)
+			{
+				for (int j = 0; j < nCount; j++)
+				{
+					m_vstrContents.emplace_back(charInfo.Char().Mid(j, 1));
+					m_vstrFonts.emplace_back(charInfo.Font());
+					m_vulColors.emplace_back(charInfo.Color());
+					m_vnSizes.emplace_back(charInfo.Size());
+				}
+				bFixed = TRUE;
+			}
+			else
+			{
+				m_vstrContents.emplace_back(charInfo.Char());
+				m_vstrFonts.emplace_back(charInfo.Font());
+				m_vulColors.emplace_back(charInfo.Color());
+				m_vnSizes.emplace_back(charInfo.Size());
+			}
+		}
+
+		return bFixed;
+	}
+
+	BOOL HasErrorTextFormat()
+	{
+		BOOL bHasError = FALSE;
+
+		CCharInfo charInfo;
+		int nSize = static_cast<int>(m_CharInfoList.size());
+
+		for (int i = 0; i < nSize; ++i)
+		{
+			charInfo = GetAt(i);
+
+			INT nCount = charInfo.Char().GetLength();
+
+			if (nCount > 1)
+			{
+				bHasError = TRUE;
+				return bHasError;
+			}
+		}
+
+		return bHasError;
+
+	}
+
+	BOOL ExtractTextFormat(void)
+	{
+		BOOL bSuccess = TRUE;
+
 		CCharInfo charInfo;
 		int nSize = static_cast<int>(m_CharInfoList.size());
 
@@ -1602,32 +1757,77 @@ public:
 		for (int i = 0; i < nSize; ++i)
 		{
 			charInfo = GetAt(i);
-			m_vstrContents.emplace_back(charInfo.Char());
-			m_vstrFonts.emplace_back(charInfo.Font());
-			m_vulColors.emplace_back(charInfo.Color());
-			m_vnSizes.emplace_back(charInfo.Size());
+
+			//INT nCount = charInfo.Char().GetLength();
+
+			//if (nCount > 1)
+			//{
+			//	for (int j = 0; j < nCount; j++)
+			//	{
+			//		m_vstrContents.emplace_back(charInfo.Char().Mid(j,1));
+			//		m_vstrFonts.emplace_back(charInfo.Font());
+			//		m_vulColors.emplace_back(charInfo.Color());
+			//		m_vnSizes.emplace_back(charInfo.Size());
+			//	}
+			//	bModified = TRUE;
+			//}
+			//else
+			{
+				m_vstrContents.emplace_back(charInfo.Char());
+				m_vstrFonts.emplace_back(charInfo.Font());
+				m_vulColors.emplace_back(charInfo.Color());
+				m_vnSizes.emplace_back(charInfo.Size());
+			}
 		}
+
+		return bSuccess;
 	}
 
-	void ExtractTextFormat(vector<CString>& vstrContents, vector<CString>& vstrFonts, vector<ULONG>& vulColors, vector<INT>& vnSizes)
-	{
-		CCharInfo CharInfo;
-		int nSize = static_cast<int>(m_CharInfoList.size());
-
-		vstrContents.clear();
-		vstrFonts.clear();
-		vulColors.clear();
-		vnSizes.clear();
-
-		for (int i = 0; i < nSize; ++i)
-		{
-			CharInfo = GetAt(i);
-			vstrContents.emplace_back(CharInfo.Char());
-			vstrFonts.emplace_back(CharInfo.Font());
-			vulColors.emplace_back(CharInfo.Color());
-			vnSizes.emplace_back(CharInfo.Size());
-		}
-	}
+//	BOOL ExtractTextFormat(vector<CString>& vstrContents, vector<CString>& vstrFonts, vector<ULONG>& vulColors, vector<INT>& vnSizes)
+//	{
+//		BOOL bModified = FALSE;
+//		CCharInfo charInfo;
+//		int nSize = static_cast<int>(m_CharInfoList.size());
+//
+//		vstrContents.clear();
+//		vstrFonts.clear();
+//		vulColors.clear();
+//		vnSizes.clear();
+//
+//		for (int i = 0; i < nSize; ++i)
+//		{
+//			charInfo = GetAt(i);
+//			INT nCount = charInfo.Char().GetLength();
+//
+//			//if (nCount > 1)
+//			//{
+//			//	//for (int j = 0; j < nCount; j++)
+//			//	//{
+//			//	//	m_vstrContents.emplace_back(charInfo.Char().Mid(j, 1));
+//			//	//	m_vstrFonts.emplace_back(charInfo.Font());
+//			//	//	m_vulColors.emplace_back(charInfo.Color());
+//			//	//	m_vnSizes.emplace_back(charInfo.Size());
+//			//	//}
+//
+//			//	bModified = TRUE;
+//
+//			//}
+//			//else
+//			{
+//				vstrContents.emplace_back(charInfo.Char());
+//				vstrFonts.emplace_back(charInfo.Font());
+//				vulColors.emplace_back(charInfo.Color());
+//				vnSizes.emplace_back(charInfo.Size());
+//			}
+//		}
+//
+////		if (bModified)
+//		{
+//			MakeCharInfoListFromTextFormat();
+//		}
+//
+//		return bModified;
+//	}
 
 	CString GetContentString(void)
 	{
@@ -1876,15 +2076,30 @@ public:
 		return m_CLNewsData.IsMixed();
 	}
 
-	void ExtractTextFormat(void)
+	BOOL FixedTextFormatFromCharInfoList()
 	{
-		m_CLNewsData.ExtractTextFormat();
+		return m_CLNewsData.FixedTextFormatFromCharInfoList();
 	}
 
-	void  ExtractTextFormat(vector<CString>& vstrContents, vector<CString>& vstrFonts, vector<ULONG>& vulColors, vector<INT>& vnSizes)
+	BOOL HasErrorTextFormat(void)
 	{
-		m_CLNewsData.ExtractTextFormat(vstrContents, vstrFonts, vulColors, vnSizes);
+		return m_CLNewsData.HasErrorTextFormat();
 	}
+
+	BOOL ExtractTextFormat(void)
+	{
+		return m_CLNewsData.ExtractTextFormat();
+	}
+
+	BOOL MakeCharInfoListFromTextFormat(void)
+	{
+		return m_CLNewsData.MakeCharInfoListFromTextFormat();
+	}
+
+	//BOOL  ExtractTextFormat(vector<CString>& vstrContents, vector<CString>& vstrFonts, vector<ULONG>& vulColors, vector<INT>& vnSizes)
+	//{
+	//	 return m_CLNewsData.ExtractTextFormat(vstrContents, vstrFonts, vulColors, vnSizes);
+	//}
 
 	// 뉴스데이터를 리플레이스하기 위해 파싱하면 텍스트와 이미지를 분리한 뉴스데이터 벡터를 만들게 되므로
 	// 뉴스데이터 벡터에서 뉴스데이터를 꺼내서 이미지 파트인지 텍스트 파트인지를 구분하게 된다
@@ -1931,13 +2146,15 @@ public:
 		for (int i = 0; i < nLength; i++)
 		{
 			CString strMid = strChar.Mid(i, 1);
-			m_CLNewsData.AddCharInfo(CCharInfo(strMid, ulColor, strFont));
+			CCharInfo ci(strMid, ulColor, strFont);
+			m_CLNewsData.AddCharInfo(ci);
 		}
 	}
 
 	void AddCharInfoForImage(CString strImage)
 	{
-		m_CLNewsData.AddCharInfo(CCharInfo(strImage, 0, const_cast<CString&>(IMAGE_FILE_TAG)));
+		CCharInfo ci(strImage, 0, const_cast<CString&>(IMAGE_FILE_TAG));
+		m_CLNewsData.AddCharInfo(ci);
 	}
 
 	void SetCharInfoList(CCharInfoList& charInfoList)
@@ -2066,7 +2283,8 @@ public:
 	CNewsDataList()
 	{
 		SetTableName(MakeKeyString());
-		SetFields(CFields(vNews_Field));
+		CFields fields(vNews_Field);
+		SetFields(fields);
 	}
 
 	CNewsDataList(CFields& fields)
@@ -2116,7 +2334,7 @@ public:
 	}
 
 
-	BOOL CNewsDataList::HaveAvailableData(void)
+	BOOL HasAvailableData(void)
 	{
 		std::vector<CNewsData> vUseData;
 
@@ -2335,8 +2553,7 @@ private:
 	std::map<CString, vector<int>> m_mapHjdCode_Pm25Values;
 	std::map<CString, float> m_mapHjdCode_Pm25Avg;
 
-	CTime m_timeReadWeather;
-	CTime m_timeReadAir;
+	CTime m_timeReadWeatherAndAir;
 
 	bool m_bLoadXlsFile;
 
@@ -2363,7 +2580,8 @@ public:
 	CWeatherDataList()
 	{
 		SetTableName(MakeKeyString());
-		SetFields(CFields(vWeather_Field));
+		CFields fields(vWeather_Field);
+		SetFields(fields);
 
 		ResetReadTime();
 
@@ -2372,9 +2590,13 @@ public:
 
 	void ResetReadTime(void)
 	{
-		m_timeReadAir = CTime(2023, 1, 1, 0, 0, 0);
-		m_timeReadWeather = CTime(2023, 1, 1, 0, 0, 0);
+		m_timeReadWeatherAndAir = CTime(2023, 1, 1, 0, 0, 0);
+		
 	}
+
+	CTime GetTimeReadWeatherAndAir(void) { return m_timeReadWeatherAndAir; }
+
+	void SetTimeReadWeatherAndAir(CTime timeReadWeatherAndAir) { m_timeReadWeatherAndAir = timeReadWeatherAndAir; }
 
 	bool LoadCodeFromXls(CString& strError)
 	{
@@ -2395,7 +2617,7 @@ public:
 		return m_bLoadXlsFile;
 	}
 
-	INT GetAllWeatherAndAirData(void)
+	INT GetAllWeatherAndAirData(BOOL bExceptAir)
 	{
 		CString strError;
 
@@ -2412,10 +2634,13 @@ public:
 			nResult = 1;
 		}
 
-		if (!GetAirData(strError))
+		if (!bExceptAir)
 		{
-			PrintLog_Message(_T("Get Air Data Error"), TRUE);
-			nResult += 1;
+			if (!GetAirData(strError))
+			{
+				PrintLog_Message(_T("Get Air Data Error"), TRUE);
+				nResult += 1;
+			}
 		}
 
 		return nResult;
@@ -2477,11 +2702,12 @@ public:
 		return false;
 	}
 
-	bool RefreshWeatherAndAirData(bool bReget)
+	bool RefreshWeatherAndAirData(bool bReget,bool bExceptAir)
 	{
+
 		if (bReget)
 		{
-			if (GetAllWeatherAndAirData() != 0)
+			if (GetAllWeatherAndAirData(bExceptAir) > 1)
 			{
 				return false;
 			}
@@ -2612,14 +2838,6 @@ public:
 
 	bool GetWeatherData(CString& strError)
 	{
-		CTime curTime = CTime::GetCurrentTime();
-
-		if (GETTIMESPAN(m_timeReadWeather, curTime).GetTotalSeconds() <= 600)  // 10분 이내이면 읽지 않음 
-		{
-			PrintLog_Message(_T("날씨 데이터 읽은 후 10분이 지나야 가능합니다!"), TRUE);
-			return true;
-		}
-
 		ClearWeatherDataForHdj_WeatherMap();
 
 		CString strWeatherJsonData;
@@ -2642,7 +2860,6 @@ public:
 			return false;
 		}
 
-		m_timeReadWeather = CTime::GetCurrentTime();
 		return true;
 	}
 
@@ -2665,10 +2882,9 @@ public:
 		headers = curl_slist_append(headers, "Content-Type:application/json");
 		headers = curl_slist_append(headers, "authorization:Basic bWlyd2VhdGhlcjprYnMxMjM0");
 
-		//	curl_easy_setopt(curl, CURLOPT_URL, "https://diapi.kbs.co.kr/api/ma01/getMaCurrentWeather");  // 예전에 쓰던 버전1
 		curl_easy_setopt(curl, CURLOPT_URL, "https://diapi.kbs.co.kr/v2/api/kma/getMaCurrentWeather");
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-		//	curl_easy_setopt(curl, CURLOPT_CAINFO, "인증파일 있어야함./cacert.pem"));
+
 		curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "{ \"pageNo\": 1, \"pageSize\": 1000, \"unitCode\": 2}");
@@ -2691,6 +2907,7 @@ public:
 		if (strWeatherJsonData.Find(_T("html")) != -1 || strWeatherJsonData.Find(_T("Time-out")) != -1)  // 만약 시간이 오래걸려 html로 응답이 오면
 		{
 			PrintLog_Message(_T("날씨 데이터 읽기 Time-Out이 발생했습니다."), TRUE);
+
 			return CURLE_UNSUPPORTED_PROTOCOL;
 		}
 
@@ -2706,6 +2923,7 @@ public:
 		if (strWeatherData.Find(_T("<")) != -1) return -1; // error 발생하면 html로 넘어옴
 
 		CWeatherData weatherData;
+		INT nZeroCount = 0;
 
 		JSONPP::CValue jsonParser;
 
@@ -2742,7 +2960,7 @@ public:
 				{
 					CString strHjdCode = data.Child(_T("hjdCode")).AsString().c_str();
 
-					auto& iter = m_mapHjdCode_WeatherData.find(strHjdCode);
+					auto iter = m_mapHjdCode_WeatherData.find(strHjdCode);
 
 					if (iter != m_mapHjdCode_WeatherData.end())
 					{
@@ -2756,6 +2974,7 @@ public:
 							{
 								CString strTemp = data.Child(_T("t1h")).AsString().c_str();
 								weatherData.SetValue(WEATHER_FIELD_INDEX::WEATHER_TEMP, strTemp);
+								if (GETINT(strTemp) == 0) nZeroCount++;
 							}
 						}
 
@@ -2784,6 +3003,9 @@ public:
 
 			}
 		}
+
+		if (nZeroCount == nReadCount) return -1; // 모든 기온이 0으로 들어오는것은 오류
+
 		return nResult;
 	}
 
@@ -2841,13 +3063,6 @@ public:
 	{
 		CString strAirJsonData;
 
-		CTime CurTime = CTime::GetCurrentTime();
-
-		if (GETTIMESPAN(m_timeReadAir, CurTime).GetTotalSeconds() < 600) // 데이터 읽은지 10분 미만이면 그냥 통과
-		{
-			PrintLog_Message(_T("미세먼지 데이터 읽은 후 10분이 지나야 가능합니다!"), TRUE);
-			return true;
-		}
 
 		ClearAirDataForHdj_WeatherMap();
 
@@ -2868,8 +3083,6 @@ public:
 		CalcAvg();
 
 		strError = _T("미세 먼지 정보 읽기 성공");
-
-		m_timeReadAir = CTime::GetCurrentTime();
 
 		return true;
 	}
@@ -2927,6 +3140,8 @@ public:
 	bool ParseAirData(CString& strAirJsonData)
 	{
 		if (strAirJsonData.Find(_T("<")) != -1) return false; // error 발생하면 html로 넘어옴
+
+		if (strAirJsonData.Find(_T("html")) != -1) return false; // error 발생하면 html로 넘어옴
 
 		if (!IsJsonFormatsSimple(strAirJsonData)) return false;  //error로 판정
 
@@ -3098,7 +3313,7 @@ public:
 
 			int nPm25Value = m_mapStationName_Pm25Value[strStationName];
 
-			auto& iter = m_mapHjdCode_Pm25Values.find(strHjdCode);
+			auto iter = m_mapHjdCode_Pm25Values.find(strHjdCode);
 
 			if (iter != m_mapHjdCode_Pm25Values.end())
 			{
@@ -3165,8 +3380,6 @@ public:
 
 	std::map<INT, CString>& MapCityCode_HdjCode() { return m_mapCityCode_HdjCode; }
 	void MapCityCode_HdjCode(std::map<INT, CString> val) { m_mapCityCode_HdjCode = val; }
-	CTime TimeReadWeather() const { return m_timeReadWeather; }
-	CTime TimeReadAir() const { return m_timeReadAir; }
 
 };
 
@@ -3269,6 +3482,22 @@ public:
 		return -1;
 	}
 
+	BOOL HasAlias(CHDdaVinci* pHDdaVinci,CString strAlias)
+	{
+		CString strFpgFileName = GetValue(NOTICE_FIELD_INDEX::TEMPLATE);
+
+		if (CFileUtils::ExistFile(strFpgFileName))
+		{
+			pHDdaVinci->Open(strFpgFileName, 1, NOTICE_PAGE_NUMBER);
+
+			CCGXObject* pObject = pHDdaVinci->GetCGXObject(strAlias, NOTICE_PAGE_NUMBER);
+
+			return (pObject != nullptr);
+
+		}
+		return FALSE;
+	}
+
 	INT GetAliases(CHDdaVinci* pHDdaVinci)
 	{
 		std::vector<CString> vAliases;
@@ -3298,7 +3527,6 @@ public:
 			}
 
 			std::sort(vAliases.begin(), vAliases.end());
-
 
 			for (auto& iter : vAliases)
 			{
@@ -3444,11 +3672,12 @@ public:
 	CNoticeDataList()
 	{
 		SetTableName(MakeKeyString());
-		SetFields(CFields(vNotice_Field));
+		CFields fields(vNotice_Field);
+		SetFields(fields);
 	}
 
 
-	bool HaveAvailableData(void)
+	BOOL HasAvailableData(void)
 	{
 		std::vector<CNoticeData> vNoticeData;
 
@@ -3456,6 +3685,29 @@ public:
 
 		return (vNoticeData.size() > 0);
 	}
+
+	BOOL HasNoAgeNotice(CHDdaVinci* pHDdaVinci,CString& strFpg)
+	{
+		
+		std::vector<CNoticeData> vNoticeData;
+
+		SelectToObjectsWithField(vNoticeData, NOTICE_FIELD_INDEX::USE, TRUE);
+
+		for (auto& iter : vNoticeData)
+		{
+			if (!iter.HasAlias(pHDdaVinci, AgeObjects[FROM_E(AGE_OBJECTS::AGE)]))
+			{
+				strFpg = iter.GetValue(NOTICE_FIELD_INDEX::TEMPLATE);
+
+				return FALSE;
+			}
+		}
+
+		strFpg = BLANK_STRING;
+
+		return TRUE;
+	}
+
 
 	virtual ~CNoticeDataList() {};
 
@@ -3996,6 +4248,8 @@ public:
 		IntervalIndex(rhs.IntervalIndex());
 		Interval(rhs.Interval());
 		AdjustTime(rhs.AdjustTime());
+
+		return *this;
 	}
 
 	void Serialize(CArchive& ar) override
@@ -4176,6 +4430,8 @@ public:
 
 		SymbolFont(rhs.SymbolFont());
 		SymbolSize(rhs.SymbolSize());
+
+		return *this;
 	}
 
 	void Serialize(CArchive& ar) override
@@ -4275,6 +4531,7 @@ class CWeatherConfig : public CClockDataObject
 	CWeatherConfig() :
 		m_nAutoReadingPeriod(20),
 		m_bAutoReading(TRUE),
+		m_bExceptAir(FALSE),
 		m_nDisplayDuration(7)
 	{
 		LoadCodeFromXls(WEATHER_CODE_INFO_XLS_FILENAME);
@@ -4285,7 +4542,8 @@ class CWeatherConfig : public CClockDataObject
 private:
 	UINT    m_nAutoReadingPeriod;
 	BOOL    m_bAutoReading;
-	UINT     m_nDisplayDuration;
+	UINT    m_nDisplayDuration;
+	BOOL    m_bExceptAir;
 	std::map<INT, CString> m_mapCode_Hdj;
 	std::map<INT, BOOL> m_mapCode_SelectCity;
 
@@ -4298,6 +4556,7 @@ public:
 		m_mapCode_Hdj = rhs.m_mapCode_Hdj;
 		m_mapCode_SelectCity = rhs.m_mapCode_SelectCity;
 
+		return *this;
 	}
 
 	bool LoadCodeFromXls(CString strXlsFileName)
@@ -4458,6 +4717,9 @@ public:
 
 	UINT DisplayDuration() { return m_nDisplayDuration; }
 	void DisplayDuration(UINT val) { m_nDisplayDuration = val; }
+
+	BOOL ExceptAir() { return m_bExceptAir; }
+	void ExceptAir(BOOL bExceptAir) { m_bExceptAir = bExceptAir; }
 };
 
 class CNoticeConfig : public CClockDataObject
@@ -4482,10 +4744,12 @@ public:
 	{
 		m_nAgeMode = rhs.m_nAgeMode;
 		m_nRepetition = rhs.m_nRepetition;
+
+		return *this;
 	}
 
 
-	CString TemplateFilesForSpread() 
+	CString TemplateFilesForSpread()
 	{ 
 		return GetStringFromVector(m_vTemplateFiles, TAB_STRING);
 	}
@@ -4548,6 +4812,8 @@ public:
 	const CManualUpConfig& operator= (const CManualUpConfig& rhs)
 	{
 		m_strManualUpTemplate = rhs.m_strManualUpTemplate;
+
+		return *this;
 	}
 
 	void Serialize(CArchive& ar) override
@@ -4960,6 +5226,7 @@ public:
 			m_BigClockSnaps[i].Serialize(ar);
 		}
 
+
 		m_pLogoConf->Serialize(ar);
 
 		for (INT i = 0; i < NUM_SNAP; i++)
@@ -4982,7 +5249,9 @@ public:
 		}
 				
 		GetPtrDataByIndex<CNewsDataList>(m_pPtrListNews, 0)->Serialize(ar);
+
 		GetPtrDataByIndex<CWeatherDataList>(m_pPtrListWeather, 0)->Serialize(ar);
+
 		GetPtrDataByIndex<CNoticeDataList>(m_pPtrListNotice, 0)->Serialize(ar);
 	}
 

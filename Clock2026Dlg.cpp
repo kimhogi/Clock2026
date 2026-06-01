@@ -1,10 +1,10 @@
-// Clock2023Dlg.cpp : implementation file
+// Clock2026Dlg.cpp : implementation file
 //
 
 #include "pch.h"
 #include "framework.h"
-#include "Clock2023.h"
-#include "Clock2023Dlg.h"
+#include "Clock2026.h"
+#include "Clock2026Dlg.h"
 #include "afxdialogex.h"
 #include "SNTP.h"
 #include "ImageConfigDlg.h"
@@ -16,6 +16,8 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+#define _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
 
 #define _TAKE_IN_LOCK_ 0
 #define _TIMER_TRANS_MODE_ 0
@@ -57,10 +59,13 @@ void CAboutDlg::DoDataExchange(CDataExchange* pDX)
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
 END_MESSAGE_MAP()
 
-// CClock2023Dlg dialog
+// CClock2026Dlg dialog
 
-CClock2023Dlg::CClock2023Dlg(CWnd* pParent /*=nullptr*/)
-	: CDialogEx(IDD_CLOCK2023_DIALOG, pParent)
+CClock2026Dlg::CClock2026Dlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_CLOCK2026_DIALOG, pParent)
+	, m_pMutexSNTP(std::make_unique<std::mutex>())
+	, m_pMutexReadWeather(std::make_unique<std::mutex>())
+	, m_pMutexHandler(std::make_unique<std::mutex>())
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
@@ -70,10 +75,13 @@ CClock2023Dlg::CClock2023Dlg(CWnd* pParent /*=nullptr*/)
 
 	m_pLiveVideo = nullptr;
 
+	InitializeMutexes();
+
 	InitValues();
+
 }
 
-void CClock2023Dlg::DoDataExchange(CDataExchange* pDX)
+void CClock2026Dlg::DoDataExchange(CDataExchange* pDX)
 {
 	INT nVal;
 	BOOL bVal;
@@ -251,6 +259,9 @@ void CClock2023Dlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_EDIT_WEATHER_DISPLAY_DURATION, nVal);
 	DDV_MinMaxInt(pDX, IDC_EDIT_WEATHER_DISPLAY_DURATION, MIN_WEATHER_DISPLAY_DURATION, MAX_WEATHER_DISPLAY_DURATION);
 
+	nVal = m_pStatus->WeatherConf()->ExceptAir();
+	DDX_Check(pDX, IDC_CHECK_EXCEPT_AIR, nVal);
+
 
 	DDX_Control(pDX, IDC_CHECK_DISP_CLOCK, m_btnDispClock);
 	DDX_Control(pDX, IDC_CHECK_DISP_BIG_CLOCK, m_btnDispBigClock);
@@ -349,7 +360,7 @@ void CClock2023Dlg::DoDataExchange(CDataExchange* pDX)
 
 }
 
-BEGIN_MESSAGE_MAP(CClock2023Dlg, CDialogEx)
+BEGIN_MESSAGE_MAP(CClock2026Dlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
@@ -364,203 +375,204 @@ BEGIN_MESSAGE_MAP(CClock2023Dlg, CDialogEx)
 
 	ON_MESSAGE(WM_APPLY_NOTICE,OnApplyNotice)
 
-	ON_MESSAGE(SSM_EDITMODEOFF, &CClock2023Dlg::OnSpreadEditModeOff)
-	ON_MESSAGE(SSM_RBUTTON, &CClock2023Dlg::OnSpreadRButtonClicked)
-	ON_MESSAGE(SSM_CLICK, &CClock2023Dlg::OnSpreadLButtonClicked)
-	ON_MESSAGE(SSM_DBLCLK, &CClock2023Dlg::OnSpreadDBClicked)
-	ON_MESSAGE(SSM_COMBOSELCHANGE, &CClock2023Dlg::OnSpreadComboSelChange)
+	ON_MESSAGE(SSM_EDITMODEOFF, &CClock2026Dlg::OnSpreadEditModeOff)
+	ON_MESSAGE(SSM_RBUTTON, &CClock2026Dlg::OnSpreadRButtonClicked)
+	ON_MESSAGE(SSM_CLICK, &CClock2026Dlg::OnSpreadLButtonClicked)
+	ON_MESSAGE(SSM_DBLCLK, &CClock2026Dlg::OnSpreadDBClicked)
+	ON_MESSAGE(SSM_COMBOSELCHANGE, &CClock2026Dlg::OnSpreadComboSelChange)
 
-	ON_COMMAND(ID_SPREAD_SORT_ASC, &CClock2023Dlg::OnSpreadSortAsc)
-	ON_COMMAND(ID_SPREAD_SORT_ASC, &CClock2023Dlg::OnSpreadSortAsc)
-	ON_COMMAND(ID_SPREAD_SORT_DESC, &CClock2023Dlg::OnSpreadSortDesc)
-	ON_COMMAND(ID_SPREAD_INSERT_ROW, &CClock2023Dlg::OnSpreadInsertRow)
-	ON_COMMAND(ID_SPREAD_DELETE_ROW, &CClock2023Dlg::OnSpreadDeleteRow)
-	ON_COMMAND(ID_SPREAD_ALL_USE, &CClock2023Dlg::OnSpreadAllUse)
-	ON_COMMAND(ID_SPREAD_ALL_DESELECT_USE, &CClock2023Dlg::OnSpreadAllDeselectUse)
-	ON_COMMAND(ID_SPREAD_INVERT_USE, &CClock2023Dlg::OnSpreadInvertUse)
+	ON_COMMAND(ID_SPREAD_SORT_ASC, &CClock2026Dlg::OnSpreadSortAsc)
+	ON_COMMAND(ID_SPREAD_SORT_ASC, &CClock2026Dlg::OnSpreadSortAsc)
+	ON_COMMAND(ID_SPREAD_SORT_DESC, &CClock2026Dlg::OnSpreadSortDesc)
+	ON_COMMAND(ID_SPREAD_INSERT_ROW, &CClock2026Dlg::OnSpreadInsertRow)
+	ON_COMMAND(ID_SPREAD_DELETE_ROW, &CClock2026Dlg::OnSpreadDeleteRow)
+	ON_COMMAND(ID_SPREAD_ALL_USE, &CClock2026Dlg::OnSpreadAllUse)
+	ON_COMMAND(ID_SPREAD_ALL_DESELECT_USE, &CClock2026Dlg::OnSpreadAllDeselectUse)
+	ON_COMMAND(ID_SPREAD_INVERT_USE, &CClock2026Dlg::OnSpreadInvertUse)
 
-	ON_COMMAND(ID_SPREAD_CLEAR_SHEET, &CClock2023Dlg::OnSpreadClearSheet)
-	ON_COMMAND(ID_SPREAD_RESTORE_SHEET, &CClock2023Dlg::OnSpreadRestoreSheet)
+	ON_COMMAND(ID_SPREAD_CLEAR_SHEET, &CClock2026Dlg::OnSpreadClearSheet)
+	ON_COMMAND(ID_SPREAD_RESTORE_SHEET, &CClock2026Dlg::OnSpreadRestoreSheet)
 
-	ON_BN_CLICKED(IDC_BUTTON_CLEAR, &CClock2023Dlg::OnBnClickedButtonClear)
+	ON_BN_CLICKED(IDC_BUTTON_CLEAR, &CClock2026Dlg::OnBnClickedButtonClear)
 
-	ON_BN_CLICKED(IDC_BUTTON_SYNC, &CClock2023Dlg::OnBnClickedButtonSync)
-	ON_CBN_SELCHANGE(IDC_COMBO_TIME_SERVER, &CClock2023Dlg::OnCbnSelchangeComboTimeServer)
+	ON_BN_CLICKED(IDC_BUTTON_SYNC, &CClock2026Dlg::OnBnClickedButtonSync)
+	ON_CBN_SELCHANGE(IDC_COMBO_TIME_SERVER, &CClock2026Dlg::OnCbnSelchangeComboTimeServer)
 	ON_WM_TIMER()
-	ON_BN_CLICKED(IDC_CHECK_AUTO_SYNC, &CClock2023Dlg::OnBnClickedCheckAutoSync)
-	ON_CBN_SELCHANGE(IDC_COMBO_INTERVAL, &CClock2023Dlg::OnCbnSelchangeComboInterval)
-	ON_EN_KILLFOCUS(IDC_EDIT_NTP_ADJUST_TIME, &CClock2023Dlg::OnEnKillfocusEditNtpAdjustTime)
+	ON_BN_CLICKED(IDC_CHECK_AUTO_SYNC, &CClock2026Dlg::OnBnClickedCheckAutoSync)
+	ON_CBN_SELCHANGE(IDC_COMBO_INTERVAL, &CClock2026Dlg::OnCbnSelchangeComboInterval)
+	ON_EN_KILLFOCUS(IDC_EDIT_NTP_ADJUST_TIME, &CClock2026Dlg::OnEnKillfocusEditNtpAdjustTime)
 
-	ON_BN_CLICKED(IDC_CHECK_DISP_CLOCK, &CClock2023Dlg::OnBnClickedCheckDispClock)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_ENTIRE_MOVE, &CClock2023Dlg::OnBnClickedCheckClockEntireMove)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_UP, &CClock2023Dlg::OnBnClickedButtonClockUp)
-	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_MOVE_SIZE, &CClock2023Dlg::OnEnKillfocusEditClockMoveSize)
-	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_SEC_OVER, &CClock2023Dlg::OnEnKillfocusEditClockSecOver)
-	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_SEC_UNDER, &CClock2023Dlg::OnEnKillfocusEditClockSecUnder)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_MOVE_ENABLE, &CClock2023Dlg::OnBnClickedCheckClockMoveEnable)
+	ON_BN_CLICKED(IDC_CHECK_DISP_CLOCK, &CClock2026Dlg::OnBnClickedCheckDispClock)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_ENTIRE_MOVE, &CClock2026Dlg::OnBnClickedCheckClockEntireMove)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_UP, &CClock2026Dlg::OnBnClickedButtonClockUp)
+	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_MOVE_SIZE, &CClock2026Dlg::OnEnKillfocusEditClockMoveSize)
+	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_SEC_OVER, &CClock2026Dlg::OnEnKillfocusEditClockSecOver)
+	ON_EN_KILLFOCUS(IDC_EDIT_CLOCK_SEC_UNDER, &CClock2026Dlg::OnEnKillfocusEditClockSecUnder)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_MOVE_ENABLE, &CClock2026Dlg::OnBnClickedCheckClockMoveEnable)
 
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_LEFT, &CClock2023Dlg::OnBnClickedButtonClockLeft)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_DOWN, &CClock2023Dlg::OnBnClickedButtonClockDown)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_RIGHT, &CClock2023Dlg::OnBnClickedButtonClockRight)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_RESET_POS, &CClock2023Dlg::OnBnClickedButtonClockResetPos)
-	ON_BN_CLICKED(IDC_BUTTON_DELETE_DATE_FORMAT, &CClock2023Dlg::OnBnClickedButtonDeleteDateFormat)
-	ON_CBN_KILLFOCUS(IDC_COMBO_DATE_FORMAT, &CClock2023Dlg::OnCbnKillfocusComboDateFormat)
-	ON_CBN_SELCHANGE(IDC_COMBO_DATE_FORMAT, &CClock2023Dlg::OnCbnSelchangeComboDateFormat)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_LEFT, &CClock2026Dlg::OnBnClickedButtonClockLeft)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_DOWN, &CClock2026Dlg::OnBnClickedButtonClockDown)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_RIGHT, &CClock2026Dlg::OnBnClickedButtonClockRight)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_RESET_POS, &CClock2026Dlg::OnBnClickedButtonClockResetPos)
+	ON_BN_CLICKED(IDC_BUTTON_DELETE_DATE_FORMAT, &CClock2026Dlg::OnBnClickedButtonDeleteDateFormat)
+	ON_CBN_KILLFOCUS(IDC_COMBO_DATE_FORMAT, &CClock2026Dlg::OnCbnKillfocusComboDateFormat)
+	ON_CBN_SELCHANGE(IDC_COMBO_DATE_FORMAT, &CClock2026Dlg::OnCbnSelchangeComboDateFormat)
 
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_24_HOUR, &CClock2023Dlg::OnBnClickedCheckClock24Hour)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_DISP_SECOND, &CClock2023Dlg::OnBnClickedCheckClockDispSecond)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_DISP_EVERY_HOUR_SEC, &CClock2023Dlg::OnBnClickedCheckClockDispEveryHourSec)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_HIDE_FIRST_DIGIT_0_OF_HOUR, &CClock2023Dlg::OnBnClickedCheckClockHideFirstDigit0OfHour)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_1, &CClock2023Dlg::OnBnClickedButtonClockSnapSave1)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_2, &CClock2023Dlg::OnBnClickedButtonClockSnapSave2)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_3, &CClock2023Dlg::OnBnClickedButtonClockSnapSave3)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_1, &CClock2023Dlg::OnBnClickedButtonClockSnapLoad1)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_2, &CClock2023Dlg::OnBnClickedButtonClockSnapLoad2)
-	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_3, &CClock2023Dlg::OnBnClickedButtonClockSnapLoad3)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_DATE_MOVE, &CClock2023Dlg::OnBnClickedCheckClockDateMove)
-	ON_BN_CLICKED(IDC_CHECK_CLOCK_TIME_MOVE, &CClock2023Dlg::OnBnClickedCheckClockTimeMove)
-	ON_BN_CLICKED(IDC_CHECK_BIG_CLOCK_MOVE_ENABLE, &CClock2023Dlg::OnBnClickedCheckBigClockMoveEnable)
-	ON_EN_KILLFOCUS(IDC_EDIT_BIG_CLOCK_MOVE_SIZE, &CClock2023Dlg::OnEnKillfocusEditBigClockMoveSize)
-	ON_BN_CLICKED(IDC_CHECK_DISP_BIG_CLOCK, &CClock2023Dlg::OnBnClickedCheckDispBigClock)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_UP, &CClock2023Dlg::OnBnClickedButtonBigClockUp)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_RIGHT, &CClock2023Dlg::OnBnClickedButtonBigClockRight)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_DOWN, &CClock2023Dlg::OnBnClickedButtonBigClockDown)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_LEFT, &CClock2023Dlg::OnBnClickedButtonBigClockLeft)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_RESET_POS, &CClock2023Dlg::OnBnClickedButtonBigClockResetPos)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_1, &CClock2023Dlg::OnBnClickedButtonBigClockSnapSave1)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_2, &CClock2023Dlg::OnBnClickedButtonBigClockSnapSave2)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_3, &CClock2023Dlg::OnBnClickedButtonBigClockSnapSave3)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_1, &CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad1)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_2, &CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad2)
-	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_3, &CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad3)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_ENTIRE_MOVE, &CClock2023Dlg::OnBnClickedCheckLogoEntireMove)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_MOVE, &CClock2023Dlg::OnBnClickedCheckLogoMove)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_LIVE_MOVE, &CClock2023Dlg::OnBnClickedCheckLogoLiveMove)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_UHD_MOVE, &CClock2023Dlg::OnBnClickedCheckLogoUhdMove)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_DONGSI_MOVE, &CClock2023Dlg::OnBnClickedCheckLogoDongsiMove)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_ENTIRE_SHOW, &CClock2023Dlg::OnBnClickedCheckLogoEntireShow)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_SHOW, &CClock2023Dlg::OnBnClickedCheckLogoShow)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_LIVE_SHOW, &CClock2023Dlg::OnBnClickedCheckLogoLiveShow)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_UHD_SHOW, &CClock2023Dlg::OnBnClickedCheckLogoUhdShow)
-	ON_BN_CLICKED(IDC_CHECK_LOGO_DONGSI_SHOW, &CClock2023Dlg::OnBnClickedCheckLogoDongsiShow)
-	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS1, &CClock2023Dlg::OnBnClickedRadioLogoKbs1)
-	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS2, &CClock2023Dlg::OnBnClickedRadioLogoKbs2)
-	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS_LOCAL, &CClock2023Dlg::OnBnClickedRadioLogoKbsLocal)
-	ON_BN_CLICKED(IDC_CHECK_DISP_STATION_LOGO, &CClock2023Dlg::OnBnClickedCheckDispStationLogo)
-	ON_EN_KILLFOCUS(IDC_EDIT_LOGO_MOVE_SIZE, &CClock2023Dlg::OnEnKillfocusEditLogoMoveSize)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_1, &CClock2023Dlg::OnBnClickedButtonLogoSnapSave1)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_2, &CClock2023Dlg::OnBnClickedButtonLogoSnapSave2)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_3, &CClock2023Dlg::OnBnClickedButtonLogoSnapSave3)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_1, &CClock2023Dlg::OnBnClickedButtonLogoSnapLoad1)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_2, &CClock2023Dlg::OnBnClickedButtonLogoSnapLoad2)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_3, &CClock2023Dlg::OnBnClickedButtonLogoSnapLoad3)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_RESET_POS, &CClock2023Dlg::OnBnClickedButtonLogoResetPos)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_UP, &CClock2023Dlg::OnBnClickedButtonLogoUp)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_RIGHT, &CClock2023Dlg::OnBnClickedButtonLogoRight)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_DOWN, &CClock2023Dlg::OnBnClickedButtonLogoDown)
-	ON_BN_CLICKED(IDC_BUTTON_LOGO_LEFT, &CClock2023Dlg::OnBnClickedButtonLogoLeft)
-	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_CATEGORY, &CClock2023Dlg::OnCbnSelchangeComboNewsCategory)
-	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_CATEGORY, &CClock2023Dlg::OnCbnKillfocusComboNewsCategory)
-	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_TEXT_FONT, &CClock2023Dlg::OnCbnSelchangeComboNewsTextFont)
-	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_TEXT_SIZE, &CClock2023Dlg::OnCbnSelchangeComboNewsTextSize)
-	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_TEXT_SIZE, &CClock2023Dlg::OnCbnKillfocusComboNewsTextSize)
-	ON_BN_CLICKED(IDC_BUTTON_DELETE_NEWS_CATEGORY_FROM_COMBO, &CClock2023Dlg::OnBnClickedButtonDeleteNewsCategoryFromCombo)
-	ON_BN_CLICKED(IDC_BUTTON_DELETE_NEWS_TEXT_SIZE_FROM_COMBO, &CClock2023Dlg::OnBnClickedButtonDeleteNewsTextSizeFromCombo)
-	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_TEXT_FONT, &CClock2023Dlg::OnCbnKillfocusComboNewsTextFont)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SYMBOL_SIZE, &CClock2023Dlg::OnEnKillfocusEditNewsSymbolSize)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_HANJA_SIZE, &CClock2023Dlg::OnKillfocusEditNewsHanjaSize)
-	ON_BN_CLICKED(IDC_BUTTON_NEWS_TEXT_COLOR, &CClock2023Dlg::OnBnClickedButtonNewsTextColor)
-	ON_NOTIFY(BCN_HOTITEMCHANGE, IDC_BUTTON_NEWS_TEXT_COLOR, &CClock2023Dlg::OnHotitemchangeButtonNewsTextColor)
-	ON_NOTIFY(BCN_HOTITEMCHANGE, IDC_BUTTON_RE_BACK_COLOR, &CClock2023Dlg::OnBnHotItemChangeButtonReBackColor)
-	ON_BN_CLICKED(IDC_BUTTON_RE_BACK_COLOR, &CClock2023Dlg::OnBnClickedButtonReBackColor)
-	ON_BN_CLICKED(IDC_BUTTON_FILE_LOAD, &CClock2023Dlg::OnBnClickedButtonFileLoad)
-	ON_BN_CLICKED(IDC_BUTTON_FILE_SAVE, &CClock2023Dlg::OnBnClickedButtonFileSave)
-	ON_BN_CLICKED(IDC_BUTTON_FILE_SAVE_AS, &CClock2023Dlg::OnBnClickedButtonFileSaveAs)
-	ON_BN_CLICKED(IDC_BUTTON_OPEN_LOG_FOLDER, &CClock2023Dlg::OnBnClickedButtonOpenLogFolder)
-	ON_BN_CLICKED(IDC_BUTTON_OPEN_LOG_FILE, &CClock2023Dlg::OnBnClickedButtonOpenLogFile)
-	ON_BN_CLICKED(IDC_BUTTON_CLEAR_LOG_MESSAGE, &CClock2023Dlg::OnBnClickedButtonClearLogMessage)
-	ON_BN_CLICKED(IDC_CHECK_APPLY_SCROLL_COLOR, &CClock2023Dlg::OnBnClickedCheckApplyScrollColor)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_24_HOUR, &CClock2026Dlg::OnBnClickedCheckClock24Hour)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_DISP_SECOND, &CClock2026Dlg::OnBnClickedCheckClockDispSecond)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_DISP_EVERY_HOUR_SEC, &CClock2026Dlg::OnBnClickedCheckClockDispEveryHourSec)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_HIDE_FIRST_DIGIT_0_OF_HOUR, &CClock2026Dlg::OnBnClickedCheckClockHideFirstDigit0OfHour)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_1, &CClock2026Dlg::OnBnClickedButtonClockSnapSave1)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_2, &CClock2026Dlg::OnBnClickedButtonClockSnapSave2)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_SAVE_3, &CClock2026Dlg::OnBnClickedButtonClockSnapSave3)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_1, &CClock2026Dlg::OnBnClickedButtonClockSnapLoad1)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_2, &CClock2026Dlg::OnBnClickedButtonClockSnapLoad2)
+	ON_BN_CLICKED(IDC_BUTTON_CLOCK_SNAP_LOAD_3, &CClock2026Dlg::OnBnClickedButtonClockSnapLoad3)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_DATE_MOVE, &CClock2026Dlg::OnBnClickedCheckClockDateMove)
+	ON_BN_CLICKED(IDC_CHECK_CLOCK_TIME_MOVE, &CClock2026Dlg::OnBnClickedCheckClockTimeMove)
+	ON_BN_CLICKED(IDC_CHECK_BIG_CLOCK_MOVE_ENABLE, &CClock2026Dlg::OnBnClickedCheckBigClockMoveEnable)
+	ON_EN_KILLFOCUS(IDC_EDIT_BIG_CLOCK_MOVE_SIZE, &CClock2026Dlg::OnEnKillfocusEditBigClockMoveSize)
+	ON_BN_CLICKED(IDC_CHECK_DISP_BIG_CLOCK, &CClock2026Dlg::OnBnClickedCheckDispBigClock)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_UP, &CClock2026Dlg::OnBnClickedButtonBigClockUp)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_RIGHT, &CClock2026Dlg::OnBnClickedButtonBigClockRight)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_DOWN, &CClock2026Dlg::OnBnClickedButtonBigClockDown)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_LEFT, &CClock2026Dlg::OnBnClickedButtonBigClockLeft)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_RESET_POS, &CClock2026Dlg::OnBnClickedButtonBigClockResetPos)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_1, &CClock2026Dlg::OnBnClickedButtonBigClockSnapSave1)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_2, &CClock2026Dlg::OnBnClickedButtonBigClockSnapSave2)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_SAVE_3, &CClock2026Dlg::OnBnClickedButtonBigClockSnapSave3)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_1, &CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad1)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_2, &CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad2)
+	ON_BN_CLICKED(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_3, &CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad3)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_ENTIRE_MOVE, &CClock2026Dlg::OnBnClickedCheckLogoEntireMove)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_MOVE, &CClock2026Dlg::OnBnClickedCheckLogoMove)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_LIVE_MOVE, &CClock2026Dlg::OnBnClickedCheckLogoLiveMove)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_UHD_MOVE, &CClock2026Dlg::OnBnClickedCheckLogoUhdMove)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_DONGSI_MOVE, &CClock2026Dlg::OnBnClickedCheckLogoDongsiMove)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_ENTIRE_SHOW, &CClock2026Dlg::OnBnClickedCheckLogoEntireShow)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_SHOW, &CClock2026Dlg::OnBnClickedCheckLogoShow)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_LIVE_SHOW, &CClock2026Dlg::OnBnClickedCheckLogoLiveShow)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_UHD_SHOW, &CClock2026Dlg::OnBnClickedCheckLogoUhdShow)
+	ON_BN_CLICKED(IDC_CHECK_LOGO_DONGSI_SHOW, &CClock2026Dlg::OnBnClickedCheckLogoDongsiShow)
+	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS1, &CClock2026Dlg::OnBnClickedRadioLogoKbs1)
+	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS2, &CClock2026Dlg::OnBnClickedRadioLogoKbs2)
+	ON_BN_CLICKED(IDC_RADIO_LOGO_KBS_LOCAL, &CClock2026Dlg::OnBnClickedRadioLogoKbsLocal)
+	ON_BN_CLICKED(IDC_CHECK_DISP_STATION_LOGO, &CClock2026Dlg::OnBnClickedCheckDispStationLogo)
+	ON_EN_KILLFOCUS(IDC_EDIT_LOGO_MOVE_SIZE, &CClock2026Dlg::OnEnKillfocusEditLogoMoveSize)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_1, &CClock2026Dlg::OnBnClickedButtonLogoSnapSave1)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_2, &CClock2026Dlg::OnBnClickedButtonLogoSnapSave2)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_SAVE_3, &CClock2026Dlg::OnBnClickedButtonLogoSnapSave3)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_1, &CClock2026Dlg::OnBnClickedButtonLogoSnapLoad1)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_2, &CClock2026Dlg::OnBnClickedButtonLogoSnapLoad2)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_SNAP_LOAD_3, &CClock2026Dlg::OnBnClickedButtonLogoSnapLoad3)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_RESET_POS, &CClock2026Dlg::OnBnClickedButtonLogoResetPos)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_UP, &CClock2026Dlg::OnBnClickedButtonLogoUp)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_RIGHT, &CClock2026Dlg::OnBnClickedButtonLogoRight)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_DOWN, &CClock2026Dlg::OnBnClickedButtonLogoDown)
+	ON_BN_CLICKED(IDC_BUTTON_LOGO_LEFT, &CClock2026Dlg::OnBnClickedButtonLogoLeft)
+	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_CATEGORY, &CClock2026Dlg::OnCbnSelchangeComboNewsCategory)
+	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_CATEGORY, &CClock2026Dlg::OnCbnKillfocusComboNewsCategory)
+	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_TEXT_FONT, &CClock2026Dlg::OnCbnSelchangeComboNewsTextFont)
+	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_TEXT_SIZE, &CClock2026Dlg::OnCbnSelchangeComboNewsTextSize)
+	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_TEXT_SIZE, &CClock2026Dlg::OnCbnKillfocusComboNewsTextSize)
+	ON_BN_CLICKED(IDC_BUTTON_DELETE_NEWS_CATEGORY_FROM_COMBO, &CClock2026Dlg::OnBnClickedButtonDeleteNewsCategoryFromCombo)
+	ON_BN_CLICKED(IDC_BUTTON_DELETE_NEWS_TEXT_SIZE_FROM_COMBO, &CClock2026Dlg::OnBnClickedButtonDeleteNewsTextSizeFromCombo)
+	ON_CBN_KILLFOCUS(IDC_COMBO_NEWS_TEXT_FONT, &CClock2026Dlg::OnCbnKillfocusComboNewsTextFont)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SYMBOL_SIZE, &CClock2026Dlg::OnEnKillfocusEditNewsSymbolSize)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_HANJA_SIZE, &CClock2026Dlg::OnKillfocusEditNewsHanjaSize)
+	ON_BN_CLICKED(IDC_BUTTON_NEWS_TEXT_COLOR, &CClock2026Dlg::OnBnClickedButtonNewsTextColor)
+	ON_NOTIFY(BCN_HOTITEMCHANGE, IDC_BUTTON_NEWS_TEXT_COLOR, &CClock2026Dlg::OnHotitemchangeButtonNewsTextColor)
+	ON_NOTIFY(BCN_HOTITEMCHANGE, IDC_BUTTON_RE_BACK_COLOR, &CClock2026Dlg::OnBnHotItemChangeButtonReBackColor)
+	ON_BN_CLICKED(IDC_BUTTON_RE_BACK_COLOR, &CClock2026Dlg::OnBnClickedButtonReBackColor)
+	ON_BN_CLICKED(IDC_BUTTON_FILE_LOAD, &CClock2026Dlg::OnBnClickedButtonFileLoad)
+	ON_BN_CLICKED(IDC_BUTTON_FILE_SAVE, &CClock2026Dlg::OnBnClickedButtonFileSave)
+	ON_BN_CLICKED(IDC_BUTTON_FILE_SAVE_AS, &CClock2026Dlg::OnBnClickedButtonFileSaveAs)
+	ON_BN_CLICKED(IDC_BUTTON_OPEN_LOG_FOLDER, &CClock2026Dlg::OnBnClickedButtonOpenLogFolder)
+	ON_BN_CLICKED(IDC_BUTTON_OPEN_LOG_FILE, &CClock2026Dlg::OnBnClickedButtonOpenLogFile)
+	ON_BN_CLICKED(IDC_BUTTON_CLEAR_LOG_MESSAGE, &CClock2026Dlg::OnBnClickedButtonClearLogMessage)
+	ON_BN_CLICKED(IDC_CHECK_APPLY_SCROLL_COLOR, &CClock2026Dlg::OnBnClickedCheckApplyScrollColor)
 	ON_WM_DESTROY()
-	ON_NOTIFY(EN_SELCHANGE, IDC_RICHEDIT_NEWS_DATA, &CClock2023Dlg::OnSelchangeRicheditNewsData)
-	ON_BN_CLICKED(IDC_BUTTON_INSERT_IMAGE, &CClock2023Dlg::OnBnClickedButtonInsertImage)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_CONFIG, &CClock2023Dlg::OnBnClickedButtonImageShortcutConfig)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_1, &CClock2023Dlg::OnBnClickedButtonImageShortcut1)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_2, &CClock2023Dlg::OnBnClickedButtonImageShortcut2)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_3, &CClock2023Dlg::OnBnClickedButtonImageShortcut3)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_4, &CClock2023Dlg::OnBnClickedButtonImageShortcut4)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_5, &CClock2023Dlg::OnBnClickedButtonImageShortcut5)
-	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_6, &CClock2023Dlg::OnBnClickedButtonImageShortcut6)
-	ON_BN_CLICKED(IDC_BUTTON_NEWS_CLEAR, &CClock2023Dlg::OnBnClickedButtonNewsClear)
-	ON_BN_CLICKED(IDC_BUTTON_NEWS_SPECIAL_CHAR, &CClock2023Dlg::OnBnClickedButtonNewsSpecialChar)
-	ON_BN_CLICKED(IDC_BUTTON_SPELL_CHECK, &CClock2023Dlg::OnBnClickedButtonSpellCheck)
-	ON_BN_CLICKED(IDC_BUTTON_RELOAD_NEWS_SCROLL_TEMPLATE, &CClock2023Dlg::OnBnClickedButtonReloadNewsScrollTemplate)
-	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_SCROLL_TEMPLATE, &CClock2023Dlg::OnCbnSelchangeComboNewsScrollTemplate)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_ITERATION, &CClock2023Dlg::OnKillfocusEditNewsScrollIteration)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_ITEM_GAP, &CClock2023Dlg::OnKillfocusEditNewsScrollItemGap)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_PREFIX_GAP, &CClock2023Dlg::OnKillfocusEditNewsScrollPrefixGap)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_SPEED, &CClock2023Dlg::OnKillfocusEditNewsScrollSpeed)
-	ON_BN_CLICKED(IDC_CHECK_DISP_NEWS, &CClock2023Dlg::OnBnClickedCheckDispNews)
-	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_DISPLAY_DURATION, &CClock2023Dlg::OnEnKillfocusEditNewsTime)
-	ON_BN_CLICKED(IDC_CHECK_PREPARE_NEWS_SCROLL, &CClock2023Dlg::OnBnClickedCheckPrepareNewsScroll)
-	ON_BN_CLICKED(IDC_CHECK_DISP_NEWS_SCROLL, &CClock2023Dlg::OnBnClickedCheckDispNewsScroll)
-	ON_BN_CLICKED(IDC_BUTTON_WEATHER_CITY_SELECT, &CClock2023Dlg::OnBnClickedButtonWeatherCitySelect)
-	ON_BN_CLICKED(IDC_BUTTON_GET_KBS_WEATHER, &CClock2023Dlg::OnBnClickedButtonGetKbsWeather)
-	ON_BN_CLICKED(IDC_BUTTON_CLEAR_WEATHER_DATA, &CClock2023Dlg::OnBnClickedButtonClearWeatherData)
-	ON_BN_CLICKED(IDC_BUTTON_CLEAR_ALL_WEATHER_DATA, &CClock2023Dlg::OnBnClickedButtonClearAllWeatherData)
-	ON_BN_CLICKED(IDC_CHECK_AUTO_WEATHER_READING, &CClock2023Dlg::OnBnClickedCheckAutoWeatherReading)
-	ON_EN_KILLFOCUS(IDC_EDIT_AUTO_READING_WEATHER_PERIOD_MIN, &CClock2023Dlg::OnEnKillfocusEditAutoReadingWeatherPeriodMin)
-	ON_BN_CLICKED(IDC_CHECK_DISP_WEATHER, &CClock2023Dlg::OnBnClickedCheckDispWeather)
-	ON_BN_CLICKED(IDC_BUTTON_WEATHER_MOVE_UP, &CClock2023Dlg::OnBnClickedButtonWeatherMoveUp)
-	ON_BN_CLICKED(IDC_BUTTON_WEATHER_MOVE_DOWN, &CClock2023Dlg::OnBnClickedButtonWeatherMoveDown)
-	ON_BN_CLICKED(IDC_BUTTON_NEWS_MOVE_UP, &CClock2023Dlg::OnBnClickedButtonNewsMoveUp)
-	ON_BN_CLICKED(IDC_BUTTON_NEWS_MOVE_DOWN, &CClock2023Dlg::OnBnClickedButtonNewsMoveDown)
-	ON_BN_CLICKED(IDC_BUTTON_RELOAD_NOTICE_TEMPLATE, &CClock2023Dlg::OnBnClickedButtonReloadNoticeTemplate)
-	ON_BN_CLICKED(IDC_BUTTON_APPLY_NOTICE, &CClock2023Dlg::OnBnClickedButtonApplyNotice)
-	ON_BN_CLICKED(IDC_RADIO_AGE_ALL, &CClock2023Dlg::OnBnClickedRadioAgeAll)
-	ON_BN_CLICKED(IDC_RADIO_AGE_7, &CClock2023Dlg::OnBnClickedRadioAge7)
-	ON_BN_CLICKED(IDC_RADIO_AGE_12, &CClock2023Dlg::OnBnClickedRadioAge12)
-	ON_BN_CLICKED(IDC_RADIO_AGE_15, &CClock2023Dlg::OnBnClickedRadioAge15)
-	ON_BN_CLICKED(IDC_RADIO_AGE_19, &CClock2023Dlg::OnBnClickedRadioAge19)
-	ON_BN_CLICKED(IDC_CHECK_DISP_AGE, &CClock2023Dlg::OnBnClickedCheckDispAge)
-	ON_BN_CLICKED(IDC_CHECK_DISP_NOTICE, &CClock2023Dlg::OnBnClickedCheckDispNotice)
-	ON_EN_KILLFOCUS(IDC_EDIT_NOTICE_REPETITION, &CClock2023Dlg::OnEnKillfocusEditNoticeRepetition)
-	ON_BN_CLICKED(IDC_CHECK_DISP_AGE_NOTICE, &CClock2023Dlg::OnBnClickedCheckDispAgeNotice)
+	ON_NOTIFY(EN_SELCHANGE, IDC_RICHEDIT_NEWS_DATA, &CClock2026Dlg::OnSelchangeRicheditNewsData)
+	ON_BN_CLICKED(IDC_BUTTON_INSERT_IMAGE, &CClock2026Dlg::OnBnClickedButtonInsertImage)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_CONFIG, &CClock2026Dlg::OnBnClickedButtonImageShortcutConfig)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_1, &CClock2026Dlg::OnBnClickedButtonImageShortcut1)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_2, &CClock2026Dlg::OnBnClickedButtonImageShortcut2)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_3, &CClock2026Dlg::OnBnClickedButtonImageShortcut3)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_4, &CClock2026Dlg::OnBnClickedButtonImageShortcut4)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_5, &CClock2026Dlg::OnBnClickedButtonImageShortcut5)
+	ON_BN_CLICKED(IDC_BUTTON_IMAGE_SHORTCUT_6, &CClock2026Dlg::OnBnClickedButtonImageShortcut6)
+	ON_BN_CLICKED(IDC_BUTTON_NEWS_CLEAR, &CClock2026Dlg::OnBnClickedButtonNewsClear)
+	ON_BN_CLICKED(IDC_BUTTON_NEWS_SPECIAL_CHAR, &CClock2026Dlg::OnBnClickedButtonNewsSpecialChar)
+	ON_BN_CLICKED(IDC_BUTTON_SPELL_CHECK, &CClock2026Dlg::OnBnClickedButtonSpellCheck)
+	ON_BN_CLICKED(IDC_BUTTON_RELOAD_NEWS_SCROLL_TEMPLATE, &CClock2026Dlg::OnBnClickedButtonReloadNewsScrollTemplate)
+	ON_CBN_SELCHANGE(IDC_COMBO_NEWS_SCROLL_TEMPLATE, &CClock2026Dlg::OnCbnSelchangeComboNewsScrollTemplate)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_ITERATION, &CClock2026Dlg::OnKillfocusEditNewsScrollIteration)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_ITEM_GAP, &CClock2026Dlg::OnKillfocusEditNewsScrollItemGap)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_PREFIX_GAP, &CClock2026Dlg::OnKillfocusEditNewsScrollPrefixGap)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_SCROLL_SPEED, &CClock2026Dlg::OnKillfocusEditNewsScrollSpeed)
+	ON_BN_CLICKED(IDC_CHECK_DISP_NEWS, &CClock2026Dlg::OnBnClickedCheckDispNews)
+	ON_EN_KILLFOCUS(IDC_EDIT_NEWS_DISPLAY_DURATION, &CClock2026Dlg::OnEnKillfocusEditNewsTime)
+	ON_BN_CLICKED(IDC_CHECK_PREPARE_NEWS_SCROLL, &CClock2026Dlg::OnBnClickedCheckPrepareNewsScroll)
+	ON_BN_CLICKED(IDC_CHECK_DISP_NEWS_SCROLL, &CClock2026Dlg::OnBnClickedCheckDispNewsScroll)
+	ON_BN_CLICKED(IDC_BUTTON_WEATHER_CITY_SELECT, &CClock2026Dlg::OnBnClickedButtonWeatherCitySelect)
+	ON_BN_CLICKED(IDC_BUTTON_GET_KBS_WEATHER, &CClock2026Dlg::OnBnClickedButtonGetKbsWeather)
+	ON_BN_CLICKED(IDC_BUTTON_CLEAR_WEATHER_DATA, &CClock2026Dlg::OnBnClickedButtonClearWeatherData)
+	ON_BN_CLICKED(IDC_BUTTON_CLEAR_ALL_WEATHER_DATA, &CClock2026Dlg::OnBnClickedButtonClearAllWeatherData)
+	ON_BN_CLICKED(IDC_CHECK_AUTO_WEATHER_READING, &CClock2026Dlg::OnBnClickedCheckAutoWeatherReading)
+	ON_EN_KILLFOCUS(IDC_EDIT_AUTO_READING_WEATHER_PERIOD_MIN, &CClock2026Dlg::OnEnKillfocusEditAutoReadingWeatherPeriodMin)
+	ON_BN_CLICKED(IDC_CHECK_DISP_WEATHER, &CClock2026Dlg::OnBnClickedCheckDispWeather)
+	ON_BN_CLICKED(IDC_BUTTON_WEATHER_MOVE_UP, &CClock2026Dlg::OnBnClickedButtonWeatherMoveUp)
+	ON_BN_CLICKED(IDC_BUTTON_WEATHER_MOVE_DOWN, &CClock2026Dlg::OnBnClickedButtonWeatherMoveDown)
+	ON_BN_CLICKED(IDC_BUTTON_NEWS_MOVE_UP, &CClock2026Dlg::OnBnClickedButtonNewsMoveUp)
+	ON_BN_CLICKED(IDC_BUTTON_NEWS_MOVE_DOWN, &CClock2026Dlg::OnBnClickedButtonNewsMoveDown)
+	ON_BN_CLICKED(IDC_BUTTON_RELOAD_NOTICE_TEMPLATE, &CClock2026Dlg::OnBnClickedButtonReloadNoticeTemplate)
+	ON_BN_CLICKED(IDC_BUTTON_APPLY_NOTICE, &CClock2026Dlg::OnBnClickedButtonApplyNotice)
+	ON_BN_CLICKED(IDC_RADIO_AGE_ALL, &CClock2026Dlg::OnBnClickedRadioAgeAll)
+	ON_BN_CLICKED(IDC_RADIO_AGE_7, &CClock2026Dlg::OnBnClickedRadioAge7)
+	ON_BN_CLICKED(IDC_RADIO_AGE_12, &CClock2026Dlg::OnBnClickedRadioAge12)
+	ON_BN_CLICKED(IDC_RADIO_AGE_15, &CClock2026Dlg::OnBnClickedRadioAge15)
+	ON_BN_CLICKED(IDC_RADIO_AGE_19, &CClock2026Dlg::OnBnClickedRadioAge19)
+	ON_BN_CLICKED(IDC_CHECK_DISP_AGE, &CClock2026Dlg::OnBnClickedCheckDispAge)
+	ON_BN_CLICKED(IDC_CHECK_DISP_NOTICE, &CClock2026Dlg::OnBnClickedCheckDispNotice)
+	ON_EN_KILLFOCUS(IDC_EDIT_NOTICE_REPETITION, &CClock2026Dlg::OnEnKillfocusEditNoticeRepetition)
+	ON_BN_CLICKED(IDC_CHECK_DISP_AGE_NOTICE, &CClock2026Dlg::OnBnClickedCheckDispAgeNotice)
 		ON_WM_MOUSEMOVE()
-		ON_BN_CLICKED(IDC_BUTTON_NOTICE_MOVE_UP, &CClock2023Dlg::OnBnClickedButtonNoticeMoveUp)
-		ON_BN_CLICKED(IDC_BUTTON_NOTICE_MOVE_DOWN, &CClock2023Dlg::OnBnClickedButtonNoticeMoveDown)
-		ON_CBN_SELCHANGE(IDC_COMBO_MANUALUP_TEMPLATES, &CClock2023Dlg::OnCbnSelchangeComboManualupTemplates)
-		ON_BN_CLICKED(IDC_BUTTON_RELOAD_MANUALUP_TEMPLATE, &CClock2023Dlg::OnBnClickedButtonReloadManualupTemplate)
-		ON_BN_CLICKED(IDC_CHECK_DISP_MANUALUP, &CClock2023Dlg::OnBnClickedCheckDispManualUp)
-		ON_BN_CLICKED(IDC_BUTTON_MANUALUP_PREV, &CClock2023Dlg::OnBnClickedButtonManualupPrev)
-		ON_BN_CLICKED(IDC_BUTTON_MANUALUP_NEXT, &CClock2023Dlg::OnBnClickedButtonManualupNext)
-		ON_BN_CLICKED(IDCANCEL, &CClock2023Dlg::OnBnClickedCancel)
-		ON_BN_CLICKED(IDC_BUTTON_LOAD_FPR, &CClock2023Dlg::OnBnClickedButtonLoadFpr)
-		ON_BN_CLICKED(IDC_CHECK_DISP_LIVE_VIDEO, &CClock2023Dlg::OnBnClickedCheckDispLiveVideo)
-		ON_BN_CLICKED(IDC_CHECK_LIVE_VIDEO_MOVE_ENABLE, &CClock2023Dlg::OnBnClickedCheckLiveVideoMoveEnable)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_RESET_POS, &CClock2023Dlg::OnBnClickedButtonLiveVideoResetPos)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_UP, &CClock2023Dlg::OnBnClickedButtonLiveVideoUp)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_LEFT, &CClock2023Dlg::OnBnClickedButtonLiveVideoLeft)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_DOWN, &CClock2023Dlg::OnBnClickedButtonLiveVideoDown)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_RIGHT, &CClock2023Dlg::OnBnClickedButtonLiveVideoRight)
-		ON_EN_KILLFOCUS(IDC_EDIT_LIVE_VIDEO_MOVE_SIZE, &CClock2023Dlg::OnEnKillfocusEditLiveVideoMoveSize)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_1, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave1)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_2, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave2)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_3, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave3)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_1, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad1)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_2, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad2)
-		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_3, &CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad3)
-		ON_CBN_SELCHANGE(IDC_COMBO_LIVE_VIDEO_TEMPLATES, &CClock2023Dlg::OnCbnSelchangeComboLiveVideoTemplates)
-		ON_BN_CLICKED(IDC_BUTTON_RELOAD_LIVE_VIDEO_TEMPLATE, &CClock2023Dlg::OnBnClickedButtonReloadLiveVideoTemplate)
-		ON_EN_KILLFOCUS(IDC_EDIT_WEATHER_DISPLAY_DURATION, &CClock2023Dlg::OnEnKillfocusEditWeatherDisplayDuration)
+		ON_BN_CLICKED(IDC_BUTTON_NOTICE_MOVE_UP, &CClock2026Dlg::OnBnClickedButtonNoticeMoveUp)
+		ON_BN_CLICKED(IDC_BUTTON_NOTICE_MOVE_DOWN, &CClock2026Dlg::OnBnClickedButtonNoticeMoveDown)
+		ON_CBN_SELCHANGE(IDC_COMBO_MANUALUP_TEMPLATES, &CClock2026Dlg::OnCbnSelchangeComboManualupTemplates)
+		ON_BN_CLICKED(IDC_BUTTON_RELOAD_MANUALUP_TEMPLATE, &CClock2026Dlg::OnBnClickedButtonReloadManualupTemplate)
+		ON_BN_CLICKED(IDC_CHECK_DISP_MANUALUP, &CClock2026Dlg::OnBnClickedCheckDispManualUp)
+		ON_BN_CLICKED(IDC_BUTTON_MANUALUP_PREV, &CClock2026Dlg::OnBnClickedButtonManualupPrev)
+		ON_BN_CLICKED(IDC_BUTTON_MANUALUP_NEXT, &CClock2026Dlg::OnBnClickedButtonManualupNext)
+		ON_BN_CLICKED(IDCANCEL, &CClock2026Dlg::OnBnClickedCancel)
+		ON_BN_CLICKED(IDC_BUTTON_LOAD_FPR, &CClock2026Dlg::OnBnClickedButtonLoadFpr)
+		ON_BN_CLICKED(IDC_CHECK_DISP_LIVE_VIDEO, &CClock2026Dlg::OnBnClickedCheckDispLiveVideo)
+		ON_BN_CLICKED(IDC_CHECK_LIVE_VIDEO_MOVE_ENABLE, &CClock2026Dlg::OnBnClickedCheckLiveVideoMoveEnable)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_RESET_POS, &CClock2026Dlg::OnBnClickedButtonLiveVideoResetPos)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_UP, &CClock2026Dlg::OnBnClickedButtonLiveVideoUp)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_LEFT, &CClock2026Dlg::OnBnClickedButtonLiveVideoLeft)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_DOWN, &CClock2026Dlg::OnBnClickedButtonLiveVideoDown)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_RIGHT, &CClock2026Dlg::OnBnClickedButtonLiveVideoRight)
+		ON_EN_KILLFOCUS(IDC_EDIT_LIVE_VIDEO_MOVE_SIZE, &CClock2026Dlg::OnEnKillfocusEditLiveVideoMoveSize)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_1, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave1)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_2, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave2)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_SAVE_3, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave3)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_1, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad1)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_2, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad2)
+		ON_BN_CLICKED(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_3, &CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad3)
+		ON_CBN_SELCHANGE(IDC_COMBO_LIVE_VIDEO_TEMPLATES, &CClock2026Dlg::OnCbnSelchangeComboLiveVideoTemplates)
+		ON_BN_CLICKED(IDC_BUTTON_RELOAD_LIVE_VIDEO_TEMPLATE, &CClock2026Dlg::OnBnClickedButtonReloadLiveVideoTemplate)
+		ON_EN_KILLFOCUS(IDC_EDIT_WEATHER_DISPLAY_DURATION, &CClock2026Dlg::OnEnKillfocusEditWeatherDisplayDuration)
 		
-		ON_BN_CLICKED(IDC_RADIO_LOGO_KBS_ANIMATION, &CClock2023Dlg::OnBnClickedRadioLogoKbsAnimation)
-		ON_BN_CLICKED(IDC_BUTTON_DATE_FORMAT, &CClock2023Dlg::OnBnClickedButtonDateFormat)
-		ON_BN_CLICKED(IDC_BUTTON1, &CClock2023Dlg::OnBnClickedButton1)
+		ON_BN_CLICKED(IDC_RADIO_LOGO_KBS_ANIMATION, &CClock2026Dlg::OnBnClickedRadioLogoKbsAnimation)
+		ON_BN_CLICKED(IDC_BUTTON_DATE_FORMAT, &CClock2026Dlg::OnBnClickedButtonDateFormat)
+		ON_BN_CLICKED(IDC_BUTTON1, &CClock2026Dlg::OnBnClickedButton1)
+		ON_BN_CLICKED(IDC_CHECK_EXCEPT_AIR, &CClock2026Dlg::OnBnClickedCheckExceptAir)
 		END_MESSAGE_MAP()
 
-// CClock2023Dlg message handlers
+// CClock2026Dlg message handlers
 
-BOOL CClock2023Dlg::OnInitDialog()
+BOOL CClock2026Dlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
@@ -591,10 +603,11 @@ BOOL CClock2023Dlg::OnInitDialog()
 
 	InitCtrls();
 
+
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
-void CClock2023Dlg::OnSysCommand(UINT nID, LPARAM lParam)
+void CClock2026Dlg::OnSysCommand(UINT nID, LPARAM lParam)
 {
 	if ((nID & 0xFFF0) == IDM_ABOUTBOX)
 	{
@@ -611,7 +624,7 @@ void CClock2023Dlg::OnSysCommand(UINT nID, LPARAM lParam)
 //  to draw the icon.  For MFC applications using the document/view model,
 //  this is automatically done for you by the framework.
 
-void CClock2023Dlg::OnPaint()
+void CClock2026Dlg::OnPaint()
 {
 	if (IsIconic())
 	{
@@ -638,12 +651,12 @@ void CClock2023Dlg::OnPaint()
 
 // The system calls this function to obtain the cursor to display while the user drags
 //  the minimized window.
-HCURSOR CClock2023Dlg::OnQueryDragIcon()
+HCURSOR CClock2026Dlg::OnQueryDragIcon()
 {
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-BOOL CClock2023Dlg::InitValues(void)
+BOOL CClock2026Dlg::InitValues(void)
 {
 	m_strPrevTime = BLANK_STRING;
 	m_bFileChange = FALSE;
@@ -665,18 +678,59 @@ BOOL CClock2023Dlg::InitValues(void)
 	return TRUE;
 }
 
-UINT CClock2023Dlg::SyncSNTPThread(LPVOID lpvoid)
+class SafeMutexLock {
+	std::mutex& m_mutex;
+	bool m_locked;
+
+public:
+	SafeMutexLock(std::mutex& mutex) : m_mutex(mutex), m_locked(false) {
+		if (mutex.try_lock()) {
+			m_locked = true;
+		}
+	}
+
+	~SafeMutexLock() {
+		if (m_locked) {
+			m_mutex.unlock();
+		}
+	}
+
+	bool isLocked() const { return m_locked; }
+};
+
+#define VERIFY_MUTEX(mutex_obj, error_msg)  
+
+
+UINT CClock2026Dlg::SyncSNTPThread(LPVOID lpvoid)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(lpvoid);
+	
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(lpvoid);
 
-	std::lock_guard<std::mutex> lock(pDlg->m_mutexSNTP);
+	if (!pDlg) return 1;
+	
 
-	pDlg->SynchronizeFromSNTP(pDlg->m_pStatus->NTPConf()->ServerName());
+	try {
+		// mutex 사용 전 상태 검증
+		if (!pDlg->m_pMutexSNTP) {
+			pDlg->PrintLog(_T("SNTP mutex is not initialized"), _T("Error"), TRUE);
+			return 1;
+		}
+
+		std::lock_guard<std::mutex> lock(pDlg->m_mutexSNTP);
+
+		pDlg->SynchronizeFromSNTP(pDlg->m_pStatus->NTPConf()->ServerName());
+		
+	return 0;
+}
+catch (const std::system_error& e) {
+	pDlg->PrintLog(CString(_T("Mutex error: ")) + CString(CA2T(e.what())), _T("Error"), TRUE);
+	return 1;
+}
 
 	return 0;
 }
 
-BOOL CClock2023Dlg::InitTimer(void)
+BOOL CClock2026Dlg::InitTimer(void)
 {
 	AutoSync();
 
@@ -690,7 +744,7 @@ BOOL CClock2023Dlg::InitTimer(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitProgressWnd(void)
+BOOL CClock2026Dlg::InitProgressWnd(void)
 {
 	m_pWndProgress = new CProgressWnd();
 	m_pWndProgress->Create(this, _T("뉴스 스크롤 생성 중..."), TRUE);
@@ -699,7 +753,7 @@ BOOL CClock2023Dlg::InitProgressWnd(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitToolTips(BOOL bNeedCreate)
+BOOL CClock2026Dlg::InitToolTips(BOOL bNeedCreate)
 {
 
 	if (bNeedCreate)
@@ -738,7 +792,7 @@ BOOL CClock2023Dlg::InitToolTips(BOOL bNeedCreate)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::DrawPreview(CPreviewStatic& staticPreview, CString strFpgFileName)
+BOOL CClock2026Dlg::DrawPreview(CPreviewStatic& staticPreview, CString strFpgFileName)
 {
 
 	if (!CFileUtils::ExistFile(strFpgFileName))
@@ -758,7 +812,7 @@ BOOL CClock2023Dlg::DrawPreview(CPreviewStatic& staticPreview, CString strFpgFil
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitCombos(void)
+BOOL CClock2026Dlg::InitCombos(void)
 {
 	INT nIndex = -1;
 	CString strFpgFileName;
@@ -790,7 +844,7 @@ BOOL CClock2023Dlg::InitCombos(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitLiveVideo(void)
+BOOL CClock2026Dlg::InitLiveVideo(void)
 {
 	CString strFpgFileName = m_pStatus->LiveVideoConf()->Template();
 
@@ -824,7 +878,7 @@ BOOL CClock2023Dlg::InitLiveVideo(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitPreview(void)
+BOOL CClock2026Dlg::InitPreview(void)
 {
 
 	m_pHDdaVinci->InitCanvas(this->GetSafeHwnd(), 0);
@@ -850,7 +904,7 @@ BOOL CClock2023Dlg::InitPreview(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitClocks(void)
+BOOL CClock2026Dlg::InitClocks(void)
 {
 
 
@@ -862,7 +916,7 @@ BOOL CClock2023Dlg::InitClocks(void)
 }
 
 
-BOOL CClock2023Dlg::InitNews(void)
+BOOL CClock2026Dlg::InitNews(void)
 {
 	CString strData = m_pStatus->NewsConf()->TextSize();
 
@@ -889,12 +943,12 @@ BOOL CClock2023Dlg::InitNews(void)
 }
 
 
-BOOL CClock2023Dlg::InitWeather(void)
+BOOL CClock2026Dlg::InitWeather(void)
 {
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitNotice(void)
+BOOL CClock2026Dlg::InitNotice(void)
 {
 	ReloadNoticeTemplate();
 
@@ -902,7 +956,7 @@ BOOL CClock2023Dlg::InitNotice(void)
 }
 
 
-BOOL CClock2023Dlg::InitEdits(void)
+BOOL CClock2026Dlg::InitEdits(void)
 {
 	InitNews();
 
@@ -917,7 +971,7 @@ BOOL CClock2023Dlg::InitEdits(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::InitButtons(void)
+BOOL CClock2026Dlg::InitButtons(void)
 {
 
 	m_btnSuperInOut.SuperIn(TRUE);
@@ -931,36 +985,36 @@ BOOL CClock2023Dlg::InitButtons(void)
 }
 
 
-BOOL CClock2023Dlg::InitCtrls(void)
+BOOL CClock2026Dlg::InitCtrls(void)
 {
 	InitTimer();
-
+	
 	InitCombos();
-
+		
 	InitPreview();
-
+		
 	InitEdits();
-
+		
 	InitButtons();
-
+		
 	InitProgressWnd();
-
+		
 	SetFonts();
-
+	
 	SetUpSpreads(FALSE);
-
+		
 	InitStatusBar();
-
+		
 	InitToolTips(TRUE);
-
+		
 	InitClocks();
-
+		
 	InitNews();
-
+	
 	InitWeather();
-
+		
 	InitNotice();
-
+		
 	InitLiveVideo();
 
 	if (CFileUtils::ExistFile(m_pStatus->m_strFileName))
@@ -982,7 +1036,7 @@ BOOL CClock2023Dlg::InitCtrls(void)
 	return TRUE;
 }
 
-INT CClock2023Dlg::FindStringFromComboBox(CString FindString, CComboBox* pCombo)
+INT CClock2026Dlg::FindStringFromComboBox(CString FindString, CComboBox* pCombo)
 {
 	CString strBuffer;
 
@@ -1000,7 +1054,7 @@ INT CClock2023Dlg::FindStringFromComboBox(CString FindString, CComboBox* pCombo)
 	return CB_ERR;
 }
 
-void CClock2023Dlg::SetComboText(CComboBox* pCombo, std::vector<CString>& vData)
+void CClock2026Dlg::SetComboText(CComboBox* pCombo, std::vector<CString>& vData)
 {
 	if (pCombo == nullptr) return;
 
@@ -1013,7 +1067,7 @@ void CClock2023Dlg::SetComboText(CComboBox* pCombo, std::vector<CString>& vData)
 	pCombo->UpdateData(FALSE);
 }
 
-void CClock2023Dlg::GetComboText(CComboBox* pCombo, std::vector<CString>& vData)
+void CClock2026Dlg::GetComboText(CComboBox* pCombo, std::vector<CString>& vData)
 {
 	if (pCombo == nullptr) return;
 
@@ -1028,39 +1082,42 @@ void CClock2023Dlg::GetComboText(CComboBox* pCombo, std::vector<CString>& vData)
 	}
 }
 
-void CClock2023Dlg::UpdateComboData(BOOL bUpdataData)
+void CClock2026Dlg::UpdateComboData(BOOL bUpdataData)
 {
 	if (bUpdataData)
 	{
-		std::vector<CString>& vFormats = m_pStatus->ClockConf()->Formats();
+		std::vector<CString> vFormats = m_pStatus->ClockConf()->Formats();
 		GetComboText(m_pComboDateFormat, vFormats);
 		m_pStatus->ClockConf()->Formats(vFormats);
 
-		std::vector<CString>& vCategories = m_pStatus->NewsConf()->Categories();
+		std::vector<CString> vCategories = m_pStatus->NewsConf()->Categories();
 		GetComboText(m_pComboNewsCategory, vCategories);
 		m_pStatus->NewsConf()->Categories(vCategories);
 		
-		std::vector<CString>& vTextSizes = m_pStatus->NewsConf()->TextSizes();
+		std::vector<CString> vTextSizes = m_pStatus->NewsConf()->TextSizes();
 		GetComboText(m_pComboNewsTextSize, vTextSizes);
 		m_pStatus->NewsConf()->TextSizes(vTextSizes);
 	}
 	else
 	{
-		SetComboText(m_pComboDateFormat, m_pStatus->ClockConf()->Formats());
-		SetComboText(m_pComboNewsCategory, m_pStatus->NewsConf()->Categories());
-		SetComboText(m_pComboNewsTextSize, m_pStatus->NewsConf()->TextSizes());
+		auto formats = m_pStatus->ClockConf()->Formats();
+		auto categories = m_pStatus->NewsConf()->Categories();
+		auto textSizes = m_pStatus->NewsConf()->TextSizes();
+		SetComboText(m_pComboDateFormat, formats);
+		SetComboText(m_pComboNewsCategory, categories);
+		SetComboText(m_pComboNewsTextSize, textSizes);
 
 		m_pComboDateFormat->SetCurSel(m_pStatus->ClockConf()->FormatIndex());
 	}
 }
 
-void CClock2023Dlg::TimedMessageBox(HWND hWnd, CString strTitle, CString strMessage, UINT uiTime, UINT nFlags /*= MB_OK*/, UINT defaultReturn /*= IDOK*/, BOOL bShowStatus /*= FALSE*/)
+void CClock2026Dlg::TimedMessageBox(HWND hWnd, CString strTitle, CString strMessage, UINT uiTime, UINT nFlags /*= MB_OK*/, UINT defaultReturn /*= IDOK*/, BOOL bShowStatus /*= FALSE*/)
 {
 	BOOL		stoppedByUser = FALSE;
 	UINT	    erg;
 	CString     strResult;
 
-	if (time > 0)
+	if (uiTime > 0)
 		erg = CDlgTimedMessageBox::TimedMessageBox(nFlags, strMessage, strTitle,
 			uiTime, defaultReturn, _T(" %lu Sec.."),
 			hWnd, &stoppedByUser);
@@ -1086,7 +1143,7 @@ void CClock2023Dlg::TimedMessageBox(HWND hWnd, CString strTitle, CString strMess
 	::MessageBox(nullptr, strMessage, _T("Info"), MB_OK);
 }
 
-void CClock2023Dlg::PrintLog(CString strLog, CString strTitle, BOOL bUseMessageBox)
+void CClock2026Dlg::PrintLog(CString strLog, CString strTitle, BOOL bUseMessageBox)
 {
 
 	if (strLog.Trim() == BLANK_STRING) return;
@@ -1140,7 +1197,7 @@ void CClock2023Dlg::PrintLog(CString strLog, CString strTitle, BOOL bUseMessageB
 	file.Close();
 }
 
-void CClock2023Dlg::UpdateImageButtons(void)
+void CClock2026Dlg::UpdateImageButtons(void)
 {
 
 	GetDlgItem(IDC_BUTTON_IMAGE_SHORTCUT_1)->EnableWindow(CFileUtils::ExistFile(m_pStatus->NewsConf()->ImageShortCut(IMAGE_SHORTCUT_1)));
@@ -1156,7 +1213,7 @@ void CClock2023Dlg::UpdateImageButtons(void)
 	}
 }
 
-BOOL CClock2023Dlg::UpdateData(BOOL bSaveAndValidate)
+BOOL CClock2026Dlg::UpdateData(BOOL bSaveAndValidate)
 {
 	BOOL bVal = FALSE;
 
@@ -1165,7 +1222,6 @@ BOOL CClock2023Dlg::UpdateData(BOOL bSaveAndValidate)
 	}
 	else
 	{
-
 		m_bPrepareNewsScroll ? m_btnNewsScrollPrepare.SetColor(m_OnAirButtonColor) : m_btnNewsScrollPrepare.SetColor(::GetSysColor(COLOR_BTNFACE));
 
 		m_pStatus->m_bDispState[DISP_UPPER_CLOCK] ? m_btnDispClock.SetColor(m_OnAirButtonColor) : m_btnDispClock.SetColor(m_OffAirButtonColor);
@@ -1187,18 +1243,18 @@ BOOL CClock2023Dlg::UpdateData(BOOL bSaveAndValidate)
 	return CDialogEx::UpdateData(bSaveAndValidate);
 }
 
-void CClock2023Dlg::SetChangeMark(BOOL bChange)
+void CClock2026Dlg::SetChangeMark(BOOL bChange)
 {
 	m_bFileChange = bChange;
-	SetWindowText(MAIN_DIALOG_TITLE + m_pStatus->m_strFileName + (bChange ? _T("*") : BLANK_STRING));
+	SetWindowText(MAIN_DIALOG_TITLE + m_pStatus->m_strFileName + (bChange ? CString(_T("*")) : BLANK_STRING));
 }
 
-BOOL CClock2023Dlg::GetChangeMark(void)
+BOOL CClock2026Dlg::GetChangeMark(void)
 {
 	return m_bFileChange;
 }
 
-void CClock2023Dlg::SetFonts(void)
+void CClock2026Dlg::SetFonts(void)
 {
 	GetDlgItem(IDC_STATIC_TIME)->SetFont(m_pStatus->UIFonts()->GetFont(FONT_STATIC_TIMER));
 
@@ -1230,20 +1286,20 @@ void CClock2023Dlg::SetFonts(void)
 
 }
 
-void CClock2023Dlg::SetStautsBar_PaneColor(INT nID, COLORREF clrText, COLORREF clrBack)
+void CClock2026Dlg::SetStautsBar_PaneColor(INT nID, COLORREF clrText, COLORREF clrBack)
 {
 	m_statusBar.SetFgColor(nID, clrText, RGB(180, 180, 180));
 	m_statusBar.SetBkColor(nID, clrBack, RGB(180, 180, 180));
 }
 
-void CClock2023Dlg::WriteStatusBar_FileName(CString strFileName)
+void CClock2026Dlg::WriteStatusBar_FileName(CString strFileName)
 {
 	SetWindowText(MAIN_DIALOG_TITLE + strFileName);
 	CString strPaneText = _T("File : ") + strFileName;
 	m_statusBar.SetPaneText(ID_INDICATOR_FILENAME - ID_INDICATOR_FILENAME, strPaneText);
 }
 
-void CClock2023Dlg::WriteStatusBar_OnAir(void)
+void CClock2026Dlg::WriteStatusBar_OnAir(void)
 {
 	BOOL bOnAir = m_pStatus->IsOnAir();
 	CString strPaneText = bOnAir ? _T("On Air") : _T("Off Air");
@@ -1263,7 +1319,7 @@ void CClock2023Dlg::WriteStatusBar_OnAir(void)
 
 }
 
-void CClock2023Dlg::WriteStatusBar_SuperInOut(void)
+void CClock2026Dlg::WriteStatusBar_SuperInOut(void)
 {
 	BOOL bSuperIn = m_btnSuperInOut.IsSuperIn();
 
@@ -1284,7 +1340,7 @@ void CClock2023Dlg::WriteStatusBar_SuperInOut(void)
 
 }
 
-void CClock2023Dlg::WriteStatusBar_MousePos(CPoint pt)
+void CClock2026Dlg::WriteStatusBar_MousePos(CPoint pt)
 {
 	CString strPaneText;
 
@@ -1296,14 +1352,14 @@ void CClock2023Dlg::WriteStatusBar_MousePos(CPoint pt)
 
 }
 
-void CClock2023Dlg::WriteStatusBar_Time(void)
+void CClock2026Dlg::WriteStatusBar_Time(void)
 {
 	CString strPaneText = CTime::GetCurrentTime().Format(_T("%Y %m %d (%a) %H:%M:%S"));
 
 	m_statusBar.SetPaneText(ID_INDICATOR_TIME - ID_INDICATOR_FILENAME, strPaneText);
 }
 
-void CClock2023Dlg::WriteStatusBar_BuildTime(void)
+void CClock2026Dlg::WriteStatusBar_BuildTime(void)
 {
 	char chDate[MAX_PATH];
 	sprintf(chDate, ("KBS MPT 2025(x64) Build : %s.%s"), __DATE__, __TIME__);  // 빌드 시간을 표시한다.
@@ -1314,7 +1370,7 @@ void CClock2023Dlg::WriteStatusBar_BuildTime(void)
 	m_statusBar.SetPaneText(ID_INDICATOR_BUILD - ID_INDICATOR_FILENAME, strPaneText);
 }
 
-void CClock2023Dlg::SetUpSpreads(BOOL bNeedDetach /*= FALSE*/)
+void CClock2026Dlg::SetUpSpreads(BOOL bNeedDetach /*= FALSE*/)
 {
 	if (bNeedDetach) DetachSpreads();
 
@@ -1333,7 +1389,7 @@ void CClock2023Dlg::SetUpSpreads(BOOL bNeedDetach /*= FALSE*/)
 
 }
 
-BOOL CClock2023Dlg::InitStatusBar(void)
+BOOL CClock2026Dlg::InitStatusBar(void)
 {
 	if (!m_statusBar.CreateStatusBar(this, indicators, sizeof(indicators) / sizeof(UINT)))
 	{
@@ -1374,7 +1430,7 @@ BOOL CClock2023Dlg::InitStatusBar(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::IsEditFocus(void)
+BOOL CClock2026Dlg::IsEditFocus(void)
 {
 	CWnd* pWnd = GetFocus();
 
@@ -1410,7 +1466,7 @@ BOOL CClock2023Dlg::IsEditFocus(void)
 	return FALSE;
 }
 
-void CClock2023Dlg::DetachSpreads(void)
+void CClock2026Dlg::DetachSpreads(void)
 {
 	m_SpreadNews.Detach();
 	m_SpreadWeather.Detach();
@@ -1418,11 +1474,12 @@ void CClock2023Dlg::DetachSpreads(void)
 	m_SpreadAlias.Detach();
 }
 
-void CClock2023Dlg::RefreshUI(void)
+void CClock2026Dlg::RefreshUI(void)
 {
 	m_SpreadNews.RefreshComboString();
 	m_SpreadNews.UpdateDataSheet(1, FALSE, FALSE);
 	m_SpreadNotice.UpdateDataSheet(1, FALSE, FALSE);
+	SelectNotice(m_CurNoticeData);
 	m_SpreadWeather.UpdateDataSheet(1, FALSE, FALSE);
 	
 	DrawPreview(m_PreviewNewsScroll, GetScrollDir() + m_pStatus->NewsConf()->ScrollTemplate());
@@ -1441,7 +1498,7 @@ void CClock2023Dlg::RefreshUI(void)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::Serialize(CArchive& ar)
+void CClock2026Dlg::Serialize(CArchive& ar)
 {
 	if (m_pStatus) m_pStatus->Serialize(ar);
 	
@@ -1453,7 +1510,7 @@ void CClock2023Dlg::Serialize(CArchive& ar)
 	}
 }
 
-BOOL CClock2023Dlg::Load(CString& strFileName)
+BOOL CClock2026Dlg::Load(CString& strFileName)
 {
 	CFileException fe;
 	CFile file;
@@ -1493,9 +1550,10 @@ BOOL CClock2023Dlg::Load(CString& strFileName)
 		return FALSE;
 	}
 
-	m_pStatus->GetWeatherList()->ClearWeatherAndAirData(); // 날씨 데이터를 지운다
+	m_curNewsData.Clear();
+	m_CurNoticeData.Clear();
 
-	AutoSync();
+	m_pStatus->GetWeatherList()->ClearWeatherAndAirData(); // 날씨 데이터를 지운다
 
 	RefreshUI();
 
@@ -1517,7 +1575,7 @@ BOOL CClock2023Dlg::Load(CString& strFileName)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::LoadFile(CString& strFileName)
+BOOL CClock2026Dlg::LoadFile(CString& strFileName)
 {
 
 	if (m_pStatus->IsOnAir())
@@ -1526,26 +1584,28 @@ BOOL CClock2023Dlg::LoadFile(CString& strFileName)
 		return FALSE;
 	}
 
-	CFileDialog dlg(TRUE, MPT_EXT, strFileName, OFN_OVERWRITEPROMPT, MPT_FILTER);
+	CFileDialog dlg(TRUE, MPT_EXT, strFileName, OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_OVERWRITEPROMPT, MPT_FILTER);
 	
 	if (dlg.DoModal() == IDOK)
 	{
 	
-		if (!Load(dlg.GetPathName()))
+		CString strTempFileName = dlg.GetPathName();
+		if (!Load(strTempFileName))
 		{
 			PrintLog(dlg.GetPathName() + _T("파일을 읽지 못했습니다."), _T("오류"), TRUE);
 			return FALSE;
 		}
-		
-		strFileName = dlg.GetPathName();
-
-		PrintLog(strFileName + _T("을 정상적으로 열었습니다."), _T("알림"), FALSE);
+		else
+		{
+			strFileName = dlg.GetPathName();
+			PrintLog(strFileName + _T("을 정상적으로 열었습니다."), _T("알림"), FALSE);
+		}
 	}
 
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedButtonFileLoad()
+void CClock2026Dlg::OnBnClickedButtonFileLoad()
 {
 	if (GetChangeMark())
 	{
@@ -1558,7 +1618,7 @@ void CClock2023Dlg::OnBnClickedButtonFileLoad()
 	LoadFile(m_pStatus->m_strFileName);
 }
 
-BOOL CClock2023Dlg::Save(CString& strFileName)
+BOOL CClock2026Dlg::Save(CString strFileName)
 {
 	CFileException fe;
 	CFile file;
@@ -1593,9 +1653,10 @@ BOOL CClock2023Dlg::Save(CString& strFileName)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::SaveAsFile(CString& strFileName)
+BOOL CClock2026Dlg::SaveAsFile(CString& strFileName)
 {
-	CFileDialog dlg(FALSE, MPT_EXT, strFileName, OFN_OVERWRITEPROMPT, MPT_FILTER);
+	CFileDialog dlg(FALSE, MPT_EXT, strFileName, OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER |OFN_OVERWRITEPROMPT, MPT_FILTER);
+
 
 	if (dlg.DoModal() == IDOK)
 	{
@@ -1614,7 +1675,7 @@ BOOL CClock2023Dlg::SaveAsFile(CString& strFileName)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::SaveFile(CString& strFileName)
+BOOL CClock2026Dlg::SaveFile(CString& strFileName)
 {
 	if (CFileUtils::IsValidFileName(strFileName))
 	{
@@ -1628,18 +1689,18 @@ BOOL CClock2023Dlg::SaveFile(CString& strFileName)
 	return SaveAsFile(strFileName);
 }
 
-void CClock2023Dlg::OnBnClickedButtonFileSave()
+void CClock2026Dlg::OnBnClickedButtonFileSave()
 {
 	SaveFile(m_pStatus->m_strFileName);
 }
 
-void CClock2023Dlg::OnBnClickedButtonFileSaveAs()
+void CClock2026Dlg::OnBnClickedButtonFileSaveAs()
 {
 	SaveAsFile(m_pStatus->m_strFileName);
 }
 
 
-BOOL CClock2023Dlg::SynchronizeFromSNTP(CString strServerName)
+BOOL CClock2026Dlg::SynchronizeFromSNTP(CString strServerName)
 {
 	WSADATA wsaData;
 	BYTE wsMajorVersion = 1;
@@ -1707,7 +1768,7 @@ BOOL CClock2023Dlg::SynchronizeFromSNTP(CString strServerName)
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedButtonSync()
+void CClock2026Dlg::OnBnClickedButtonSync()
 {
 	GetDlgItem(IDC_BUTTON_SYNC)->EnableWindow(FALSE);
 
@@ -1716,7 +1777,7 @@ void CClock2023Dlg::OnBnClickedButtonSync()
 	GetDlgItem(IDC_BUTTON_SYNC)->EnableWindow(TRUE);
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboTimeServer()
+void CClock2026Dlg::OnCbnSelchangeComboTimeServer()
 {
 	CComboBox* pCombo = static_cast<CComboBox*>(GetDlgItem(IDC_COMBO_TIME_SERVER));
 	CString strNewServerName;
@@ -1735,7 +1796,7 @@ void CClock2023Dlg::OnCbnSelchangeComboTimeServer()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnTimer(UINT_PTR nIDEvent)
+void CClock2026Dlg::OnTimer(UINT_PTR nIDEvent)
 {
 	CTime time = CTime::GetCurrentTime();
 	CString strTime = time.Format(_T("%H:%M:%S"));
@@ -1911,7 +1972,7 @@ void CClock2023Dlg::OnTimer(UINT_PTR nIDEvent)
 	CDialogEx::OnTimer(nIDEvent);
 }
 
-void CClock2023Dlg::AutoSync(void)
+void CClock2026Dlg::AutoSync(void)
 {
 	if (m_pStatus->NTPConf()->AutoSync())
 	{
@@ -1923,14 +1984,14 @@ void CClock2023Dlg::AutoSync(void)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedCheckAutoSync()
+void CClock2026Dlg::OnBnClickedCheckAutoSync()
 {
 	m_pStatus->NTPConf()->AutoSync(IsDlgButtonChecked(IDC_CHECK_AUTO_SYNC));
 
 	AutoSync();
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboInterval()
+void CClock2026Dlg::OnCbnSelchangeComboInterval()
 {
 	CComboBox* pCombo = static_cast<CComboBox*>(GetDlgItem(IDC_COMBO_INTERVAL));
 
@@ -1948,7 +2009,7 @@ void CClock2023Dlg::OnCbnSelchangeComboInterval()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnEnKillfocusEditNtpAdjustTime()
+void CClock2026Dlg::OnEnKillfocusEditNtpAdjustTime()
 {
 	CString strBuffer;
 	INT nTime = 0;
@@ -1963,7 +2024,7 @@ void CClock2023Dlg::OnEnKillfocusEditNtpAdjustTime()
 	}
 }
 
-BOOL CClock2023Dlg::PreTranslateMessage(MSG* pMsg)
+BOOL CClock2026Dlg::PreTranslateMessage(MSG* pMsg)
 {
 	CWnd* pWnd;
 	CString strFontName;
@@ -2094,21 +2155,21 @@ BOOL CClock2023Dlg::PreTranslateMessage(MSG* pMsg)
 	return CDialogEx::PreTranslateMessage(pMsg);
 }
 
-LRESULT CClock2023Dlg::OnSuperInOut(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSuperInOut(WPARAM wParam, LPARAM lParam)
 {
 	m_btnSuperInOut.Toggle();
 
 	return 0;
 }
 
-LRESULT CClock2023Dlg::OnHDdaVinciClear(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnHDdaVinciClear(WPARAM wParam, LPARAM lParam)
 {
 	HDdaVinciClear();
 
 	return 0;
 }
 
-LRESULT CClock2023Dlg::OnPrintLog(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnPrintLog(WPARAM wParam, LPARAM lParam)
 {
 	WND_ARG* pArg = reinterpret_cast<WND_ARG*>(lParam);
 
@@ -2119,7 +2180,7 @@ LRESULT CClock2023Dlg::OnPrintLog(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-void CClock2023Dlg::KillTimersForDisplay(void)
+void CClock2026Dlg::KillTimersForDisplay(void)
 {
 	KillTimer(ID_TIMER_NEWS_DATA);
 	KillTimer(ID_TIMER_WEATHER_DATA);
@@ -2128,7 +2189,7 @@ void CClock2023Dlg::KillTimersForDisplay(void)
 	KillTimer(ID_TIMER_DISPLAY_STATION_LOGO);
 }
 
-void CClock2023Dlg::HDdaVinciClear(void)
+void CClock2026Dlg::HDdaVinciClear(void)
 {
 #ifdef _THREAD_TRANS_MODE_
 	_MEASURE_START_(1)
@@ -2184,13 +2245,13 @@ void CClock2023Dlg::HDdaVinciClear(void)
 #endif
 }
 
-void CClock2023Dlg::OnBnClickedButtonClear()
+void CClock2026Dlg::OnBnClickedButtonClear()
 {
 	HDdaVinciClear();
 	EnableWindow(0, FALSE);
 }
 
-BOOL CClock2023Dlg::OpenFpg(CString strSceneName, int nPage,CString strPath)
+BOOL CClock2026Dlg::OpenFpg(CString strSceneName, int nPage,CString strPath)
 {
 	CString strFpgFileName = strPath + strSceneName;
 
@@ -2212,7 +2273,7 @@ BOOL CClock2023Dlg::OpenFpg(CString strSceneName, int nPage,CString strPath)
 	return TRUE;
 }
 
-void CClock2023Dlg::GetDateForClock(CTimeString& timeString, CString& strDate)
+void CClock2026Dlg::GetDateForClock(CTimeString& timeString, CString& strDate)
 {
 	strDate = m_pStatus->ClockConf()->Format();
 
@@ -2224,7 +2285,7 @@ void CClock2023Dlg::GetDateForClock(CTimeString& timeString, CString& strDate)
 	strDate.Replace(_T("%A"), timeString.m_strDayOfWeek);
 }
 
-void CClock2023Dlg::GetHourForClock(CTimeString& timeString, CString& strHour)
+void CClock2026Dlg::GetHourForClock(CTimeString& timeString, CString& strHour)
 {
 	CString strHour10;
 
@@ -2239,7 +2300,7 @@ void CClock2023Dlg::GetHourForClock(CTimeString& timeString, CString& strHour)
 	strHour.Format(_T("%s%s"), timeString.m_strHour10, timeString.m_strHour1);
 }
 
-void CClock2023Dlg::GetOrigPosClockObjects(void)
+void CClock2026Dlg::GetOrigPosClockObjects(void)
 {
 	if (!OpenFpg(_T("상단시계"), CLOCK_PAGE_NUMBER))
 	{
@@ -2287,11 +2348,11 @@ void CClock2023Dlg::GetOrigPosClockObjects(void)
 		&(m_pStatus->ClockConf()->OrigPos().m_ptSec.Y));
 }
 
-void CClock2023Dlg::SetPosClockObjects(void)
+void CClock2026Dlg::SetPosClockObjects(void)
 {
-	SClockPos& origPos = m_pStatus->ClockConf()->OrigPos();
-	Point& ptDateOffset = m_pStatus->ClockConf()->DateOffset();
-	Point& ptTimeOffset = m_pStatus->ClockConf()->TimeOffset();
+	SClockPos origPos = m_pStatus->ClockConf()->OrigPos();
+	Point ptDateOffset = m_pStatus->ClockConf()->DateOffset();
+	Point ptTimeOffset = m_pStatus->ClockConf()->TimeOffset();
 
 	m_pHDdaVinci->ObjectSetPositionByAbs(clockObjects[FROM_E(CLOCK_OBJECTS::DATE)],
 		origPos.m_ptDate.X + ptDateOffset.X,
@@ -2335,7 +2396,7 @@ void CClock2023Dlg::SetPosClockObjects(void)
 		CLOCK_PAGE_NUMBER);
 }
 
-BOOL CClock2023Dlg::DisplayClock(void)
+BOOL CClock2026Dlg::DisplayClock(void)
 {
 	if (!m_pStatus->GetDispState(DISP_UPPER_CLOCK))
 	{
@@ -2394,7 +2455,7 @@ BOOL CClock2023Dlg::DisplayClock(void)
 	return TRUE;
 }
 
-LRESULT CClock2023Dlg::OnDispCheck(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0 */)
+LRESULT CClock2026Dlg::OnDispCheck(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0 */)
 {
 	INT nDispID = -1;
 	INT nParam = 0;
@@ -2409,8 +2470,8 @@ LRESULT CClock2023Dlg::OnDispCheck(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0
 	}
 	else
 	{
-		nDispID = wParam;
-		nParam = lParam;
+		nDispID = static_cast<INT>(wParam);
+		nParam = static_cast<INT>(lParam);
 	}
 
 	switch (nDispID)
@@ -2436,9 +2497,9 @@ LRESULT CClock2023Dlg::OnDispCheck(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0
 	return 0;
 }
 
-UINT CClock2023Dlg::DisplayClockThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayClockThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_UPPER_CLOCK))
 	{
@@ -2453,7 +2514,7 @@ UINT CClock2023Dlg::DisplayClockThread(LPVOID pParam)
 	return 0;
 }
 
-BOOL CClock2023Dlg::TakeOutClock()
+BOOL CClock2026Dlg::TakeOutClock()
 {
 
 	if (!m_pStatus->GetDispState(DISP_UPPER_CLOCK)) return FALSE;
@@ -2473,7 +2534,7 @@ BOOL CClock2023Dlg::TakeOutClock()
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispClock()
+void CClock2026Dlg::OnBnClickedCheckDispClock()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_CLOCK);
 
@@ -2507,7 +2568,7 @@ void CClock2023Dlg::OnBnClickedCheckDispClock()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockMoveEnable()
+void CClock2026Dlg::OnBnClickedCheckClockMoveEnable()
 {
 	m_pStatus->ClockConf()->MoveEnable(IsDlgButtonChecked(IDC_CHECK_CLOCK_MOVE_ENABLE));
 	EnableClockWindow();
@@ -2515,7 +2576,7 @@ void CClock2023Dlg::OnBnClickedCheckClockMoveEnable()
 	
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockEntireMove()
+void CClock2026Dlg::OnBnClickedCheckClockEntireMove()
 {
 	BOOL bEntireMove = IsDlgButtonChecked(IDC_CHECK_CLOCK_ENTIRE_MOVE);
 
@@ -2527,14 +2588,14 @@ void CClock2023Dlg::OnBnClickedCheckClockEntireMove()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockDateMove()
+void CClock2026Dlg::OnBnClickedCheckClockDateMove()
 {
 	m_pStatus->ClockConf()->DateMove(IsDlgButtonChecked(IDC_CHECK_CLOCK_DATE_MOVE));
 
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockTimeMove()
+void CClock2026Dlg::OnBnClickedCheckClockTimeMove()
 {
 	m_pStatus->ClockConf()->TimeMove(IsDlgButtonChecked(IDC_CHECK_CLOCK_TIME_MOVE));
 
@@ -2542,7 +2603,7 @@ void CClock2023Dlg::OnBnClickedCheckClockTimeMove()
 
 }
 
-void CClock2023Dlg::OnEnKillfocusEditClockMoveSize()
+void CClock2026Dlg::OnEnKillfocusEditClockMoveSize()
 {
 	CString strBuffer;
 
@@ -2557,7 +2618,7 @@ void CClock2023Dlg::OnEnKillfocusEditClockMoveSize()
 	SetDlgItemText(IDC_EDIT_CLOCK_MOVE_SIZE, GETSTR(m_pStatus->ClockConf()->MovingSize()));
 }
 
-void CClock2023Dlg::OnEnKillfocusEditClockSecOver()
+void CClock2026Dlg::OnEnKillfocusEditClockSecOver()
 {
 	CString strBuffer;
 
@@ -2572,7 +2633,7 @@ void CClock2023Dlg::OnEnKillfocusEditClockSecOver()
 	SetDlgItemText(IDC_EDIT_CLOCK_SEC_OVER, m_pStatus->ClockConf()->SecOver());
 }
 
-void CClock2023Dlg::OnEnKillfocusEditClockSecUnder()
+void CClock2026Dlg::OnEnKillfocusEditClockSecUnder()
 {
 	CString strBuffer;
 
@@ -2587,83 +2648,83 @@ void CClock2023Dlg::OnEnKillfocusEditClockSecUnder()
 	SetDlgItemText(IDC_EDIT_CLOCK_SEC_UNDER, m_pStatus->ClockConf()->SecUnder());
 }
 
-void CClock2023Dlg::ClockMoveUp()
+void CClock2026Dlg::ClockMoveUp()
 {
 	BOOL bEntireMove = m_pStatus->ClockConf()->EntireMove();
 
 	if (m_pStatus->ClockConf()->DateMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->DateOffset();
+		Point ptOffset = m_pStatus->ClockConf()->DateOffset();
 		ptOffset.Y -= m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->DateOffset(ptOffset);
 	}
 
 	if (m_pStatus->ClockConf()->TimeMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->TimeOffset();
+		Point ptOffset = m_pStatus->ClockConf()->TimeOffset();
 		ptOffset.Y -= m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->TimeOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::ClockMoveLeft()
+void CClock2026Dlg::ClockMoveLeft()
 {
 	BOOL bEntireMove = m_pStatus->ClockConf()->EntireMove();
 
 	if (m_pStatus->ClockConf()->DateMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->DateOffset();
+		Point ptOffset = m_pStatus->ClockConf()->DateOffset();
 		ptOffset.X -= m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->DateOffset(ptOffset);
 	}
 
 	if (m_pStatus->ClockConf()->TimeMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->TimeOffset();
+		Point ptOffset = m_pStatus->ClockConf()->TimeOffset();
 		ptOffset.X -= m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->TimeOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::ClockMoveDown()
+void CClock2026Dlg::ClockMoveDown()
 {
 	BOOL bEntireMove = m_pStatus->ClockConf()->EntireMove();
 
 	if (m_pStatus->ClockConf()->DateMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->DateOffset();
+		Point ptOffset = m_pStatus->ClockConf()->DateOffset();
 		ptOffset.Y += m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->DateOffset(ptOffset);
 	}
 
 	if (m_pStatus->ClockConf()->TimeMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->TimeOffset();
+		Point ptOffset = m_pStatus->ClockConf()->TimeOffset();
 		ptOffset.Y += m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->TimeOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::ClockMoveRight()
+void CClock2026Dlg::ClockMoveRight()
 {
 	BOOL bEntireMove = m_pStatus->ClockConf()->EntireMove();
 
 	if (m_pStatus->ClockConf()->DateMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->DateOffset();
+		Point ptOffset = m_pStatus->ClockConf()->DateOffset();
 		ptOffset.X += m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->DateOffset(ptOffset);
 	}
 
 	if (m_pStatus->ClockConf()->TimeMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->ClockConf()->TimeOffset();
+		Point ptOffset = m_pStatus->ClockConf()->TimeOffset();
 		ptOffset.X += m_pStatus->ClockConf()->MovingSize();
 		m_pStatus->ClockConf()->TimeOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::ClockMove(DIRECTION dir)
+void CClock2026Dlg::ClockMove(DIRECTION dir)
 {
 	switch (dir)
 	{
@@ -2688,27 +2749,27 @@ void CClock2023Dlg::ClockMove(DIRECTION dir)
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockUp()
+void CClock2026Dlg::OnBnClickedButtonClockUp()
 {
 	ClockMove(DIRECTION::UP);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockLeft()
+void CClock2026Dlg::OnBnClickedButtonClockLeft()
 {
 	ClockMove(DIRECTION::LEFT);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockDown()
+void CClock2026Dlg::OnBnClickedButtonClockDown()
 {
 	ClockMove(DIRECTION::DOWN);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockRight()
+void CClock2026Dlg::OnBnClickedButtonClockRight()
 {
 	ClockMove(DIRECTION::RIGHT);
 }
 
-void CClock2023Dlg::ClockResetPos()
+void CClock2026Dlg::ClockResetPos()
 {
 	Point ptOffset(0, 0);
 
@@ -2718,12 +2779,12 @@ void CClock2023Dlg::ClockResetPos()
 	SendMessage(WM_DISP_CHECK, DISP_UPPER_CLOCK, FROM_E<GET_POS>(GET_POS::NO));
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockResetPos()
+void CClock2026Dlg::OnBnClickedButtonClockResetPos()
 {
 	ClockResetPos();
 }
 
-void CClock2023Dlg::DeleteDateFormat()
+void CClock2026Dlg::DeleteDateFormat()
 {
 	CString strFormat;
 	CString strMsg;
@@ -2775,12 +2836,12 @@ void CClock2023Dlg::DeleteDateFormat()
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonDeleteDateFormat()
+void CClock2026Dlg::OnBnClickedButtonDeleteDateFormat()
 {
 	DeleteDateFormat();
 }
 
-void CClock2023Dlg::InsertDateFormat()
+void CClock2026Dlg::InsertDateFormat()
 {
 	CString strFormat;
 
@@ -2807,12 +2868,12 @@ void CClock2023Dlg::InsertDateFormat()
 	}
 }
 
-void CClock2023Dlg::OnCbnKillfocusComboDateFormat()
+void CClock2026Dlg::OnCbnKillfocusComboDateFormat()
 {
 	InsertDateFormat();
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboDateFormat()
+void CClock2026Dlg::OnCbnSelchangeComboDateFormat()
 {
 	CString strFormat;
 	int nIndex = m_pComboDateFormat->GetCurSel();
@@ -2827,7 +2888,7 @@ void CClock2023Dlg::OnCbnSelchangeComboDateFormat()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClock24Hour()
+void CClock2026Dlg::OnBnClickedCheckClock24Hour()
 {
 	m_pStatus->ClockConf()->B24Hour(IsDlgButtonChecked(IDC_CHECK_CLOCK_24_HOUR));
 
@@ -2837,7 +2898,7 @@ void CClock2023Dlg::OnBnClickedCheckClock24Hour()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockDispSecond()
+void CClock2026Dlg::OnBnClickedCheckClockDispSecond()
 {
 	m_pStatus->ClockConf()->DispSecond(IsDlgButtonChecked(IDC_CHECK_CLOCK_DISP_SECOND));
 
@@ -2847,7 +2908,7 @@ void CClock2023Dlg::OnBnClickedCheckClockDispSecond()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockDispEveryHourSec()
+void CClock2026Dlg::OnBnClickedCheckClockDispEveryHourSec()
 {
 	m_pStatus->ClockConf()->DispEveryHourSecond(IsDlgButtonChecked(IDC_CHECK_CLOCK_DISP_EVERY_HOUR_SEC));
 
@@ -2857,7 +2918,7 @@ void CClock2023Dlg::OnBnClickedCheckClockDispEveryHourSec()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckClockHideFirstDigit0OfHour()
+void CClock2026Dlg::OnBnClickedCheckClockHideFirstDigit0OfHour()
 {
 	m_pStatus->ClockConf()->HideFirstDigit0OfHour(IsDlgButtonChecked(IDC_CHECK_CLOCK_HIDE_FIRST_DIGIT_0_OF_HOUR));
 
@@ -2867,7 +2928,7 @@ void CClock2023Dlg::OnBnClickedCheckClockHideFirstDigit0OfHour()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::ClockSnapSave(INT nSnapNumber)
+void CClock2026Dlg::ClockSnapSave(INT nSnapNumber)
 {
 	CString strTitle = m_pStatus->ClockSnap(nSnapNumber).Title();
 	CInputDlg dlg(strTitle);
@@ -2882,22 +2943,22 @@ void CClock2023Dlg::ClockSnapSave(INT nSnapNumber)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapSave1()
+void CClock2026Dlg::OnBnClickedButtonClockSnapSave1()
 {
 	ClockSnapSave(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapSave2()
+void CClock2026Dlg::OnBnClickedButtonClockSnapSave2()
 {
 	ClockSnapSave(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapSave3()
+void CClock2026Dlg::OnBnClickedButtonClockSnapSave3()
 {
 	ClockSnapSave(2);
 }
 
-void CClock2023Dlg::ClockSnapLoad(INT nSnapNumber)
+void CClock2026Dlg::ClockSnapLoad(INT nSnapNumber)
 {
 	m_pStatus->LoadClockSnap(nSnapNumber);
 
@@ -2910,23 +2971,23 @@ void CClock2023Dlg::ClockSnapLoad(INT nSnapNumber)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapLoad1()
+void CClock2026Dlg::OnBnClickedButtonClockSnapLoad1()
 {
 	ClockSnapLoad(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapLoad2()
+void CClock2026Dlg::OnBnClickedButtonClockSnapLoad2()
 {
 	ClockSnapLoad(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonClockSnapLoad3()
+void CClock2026Dlg::OnBnClickedButtonClockSnapLoad3()
 {
 	ClockSnapLoad(2);
 
 }
 
-void CClock2023Dlg::OnBnClickedCheckBigClockMoveEnable()
+void CClock2026Dlg::OnBnClickedCheckBigClockMoveEnable()
 {
 	m_pStatus->BigClockConf()->MoveEnable(IsDlgButtonChecked(IDC_CHECK_BIG_CLOCK_MOVE_ENABLE));
 
@@ -2935,7 +2996,7 @@ void CClock2023Dlg::OnBnClickedCheckBigClockMoveEnable()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnEnKillfocusEditBigClockMoveSize()
+void CClock2026Dlg::OnEnKillfocusEditBigClockMoveSize()
 {
 	CString strBuffer;
 
@@ -2950,47 +3011,47 @@ void CClock2023Dlg::OnEnKillfocusEditBigClockMoveSize()
 	SetDlgItemText(IDC_EDIT_BIG_CLOCK_MOVE_SIZE, GETSTR(m_pStatus->BigClockConf()->MovingSize()));
 }
 
-void CClock2023Dlg::BigClockMoveUp()
+void CClock2026Dlg::BigClockMoveUp()
 {
 	if (m_pStatus->BigClockConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->BigClockConf()->Offset();
+		Point ptOffset = m_pStatus->BigClockConf()->Offset();
 		ptOffset.Y -= m_pStatus->BigClockConf()->MovingSize();
 		m_pStatus->BigClockConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::BigClockMoveLeft()
+void CClock2026Dlg::BigClockMoveLeft()
 {
 	if (m_pStatus->BigClockConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->BigClockConf()->Offset();
+		Point ptOffset = m_pStatus->BigClockConf()->Offset();
 		ptOffset.X -= m_pStatus->BigClockConf()->MovingSize();
 		m_pStatus->BigClockConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::BigClockMoveDown()
+void CClock2026Dlg::BigClockMoveDown()
 {
 	if (m_pStatus->BigClockConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->BigClockConf()->Offset();
+		Point ptOffset = m_pStatus->BigClockConf()->Offset();
 		ptOffset.Y += m_pStatus->BigClockConf()->MovingSize();
 		m_pStatus->BigClockConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::BigClockMoveRight()
+void CClock2026Dlg::BigClockMoveRight()
 {
 	if (m_pStatus->BigClockConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->BigClockConf()->Offset();
+		Point ptOffset = m_pStatus->BigClockConf()->Offset();
 		ptOffset.X += m_pStatus->BigClockConf()->MovingSize();
 		m_pStatus->BigClockConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::BigClockMove(DIRECTION dir)
+void CClock2026Dlg::BigClockMove(DIRECTION dir)
 {
 	switch (dir)
 	{
@@ -3015,7 +3076,7 @@ void CClock2023Dlg::BigClockMove(DIRECTION dir)
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::BigClockResetPos()
+void CClock2026Dlg::BigClockResetPos()
 {
 	Point ptOffset(0, 0);
 
@@ -3024,7 +3085,7 @@ void CClock2023Dlg::BigClockResetPos()
 	SendMessage(WM_DISP_CHECK, DISP_BIG_CLOCK, FROM_E<GET_POS>(GET_POS::NO));
 }
 
-void CClock2023Dlg::GetOrigPosBigClockObjects(void)
+void CClock2026Dlg::GetOrigPosBigClockObjects(void)
 {
 	if (!OpenFpg(_T("시보시계"), CLOCK_PAGE_NUMBER))
 	{
@@ -3068,11 +3129,11 @@ void CClock2023Dlg::GetOrigPosBigClockObjects(void)
 		&(m_pStatus->BigClockConf()->OrigPos().m_ptSec.Y));
 }
 
-void CClock2023Dlg::SetPosBigClockObjects(void)
+void CClock2026Dlg::SetPosBigClockObjects(void)
 {
 
-	SClockPos& origPos = m_pStatus->BigClockConf()->OrigPos();
-	Point& ptOffset = m_pStatus->BigClockConf()->Offset();
+	SClockPos origPos = m_pStatus->BigClockConf()->OrigPos();
+	Point ptOffset = m_pStatus->BigClockConf()->Offset();
 
 	m_pHDdaVinci->ObjectSetPositionByAbsEx(bigClockObjects[FROM_E(BIG_CLOCK_OBJECTS::HOUR)],
 		origPos.m_ptHour.X + ptOffset.X,
@@ -3111,7 +3172,7 @@ void CClock2023Dlg::SetPosBigClockObjects(void)
 		CLOCK_PAGE_NUMBER);
 }
 
-BOOL CClock2023Dlg::DisplayBigClock(void)
+BOOL CClock2026Dlg::DisplayBigClock(void)
 {
 	if (!m_pStatus->GetDispState(DISP_BIG_CLOCK))
 	{
@@ -3147,9 +3208,9 @@ BOOL CClock2023Dlg::DisplayBigClock(void)
 }
 
 
-UINT CClock2023Dlg::DisplayBigClockThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayBigClockThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_BIG_CLOCK))
 	{
@@ -3164,7 +3225,7 @@ UINT CClock2023Dlg::DisplayBigClockThread(LPVOID pParam)
 	return 0;
 }
 
-BOOL CClock2023Dlg::TakeOutBigClock(void)
+BOOL CClock2026Dlg::TakeOutBigClock(void)
 {
 	if (!m_pStatus->GetDispState(DISP_BIG_CLOCK)) return FALSE;
 
@@ -3183,7 +3244,7 @@ BOOL CClock2023Dlg::TakeOutBigClock(void)
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispBigClock()
+void CClock2026Dlg::OnBnClickedCheckDispBigClock()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_BIG_CLOCK);
 
@@ -3218,32 +3279,32 @@ void CClock2023Dlg::OnBnClickedCheckDispBigClock()
 	
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockUp()
+void CClock2026Dlg::OnBnClickedButtonBigClockUp()
 {
 	BigClockMove(DIRECTION::UP);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockRight()
+void CClock2026Dlg::OnBnClickedButtonBigClockRight()
 {
 	BigClockMove(DIRECTION::RIGHT);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockDown()
+void CClock2026Dlg::OnBnClickedButtonBigClockDown()
 {
 	BigClockMove(DIRECTION::DOWN);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockLeft()
+void CClock2026Dlg::OnBnClickedButtonBigClockLeft()
 {
 	BigClockMove(DIRECTION::LEFT);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockResetPos()
+void CClock2026Dlg::OnBnClickedButtonBigClockResetPos()
 {
 	BigClockResetPos();
 }
 
-void CClock2023Dlg::BigClockSnapSave(INT nSnapNumber)
+void CClock2026Dlg::BigClockSnapSave(INT nSnapNumber)
 {
 	CString strTitle = m_pStatus->BigClockSnap(nSnapNumber).Title();
 	CInputDlg dlg(strTitle);
@@ -3258,23 +3319,23 @@ void CClock2023Dlg::BigClockSnapSave(INT nSnapNumber)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapSave1()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapSave1()
 {
 	BigClockSnapSave(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapSave2()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapSave2()
 {
 	BigClockSnapSave(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapSave3()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapSave3()
 {
 	BigClockSnapSave(2);
 	
 }
 
-void CClock2023Dlg::BigClockSnapLoad(INT nSnapNumber)
+void CClock2026Dlg::BigClockSnapLoad(INT nSnapNumber)
 {
 	m_pStatus->LoadBigClockSnap(nSnapNumber);
 
@@ -3287,22 +3348,22 @@ void CClock2023Dlg::BigClockSnapLoad(INT nSnapNumber)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad1()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad1()
 {
 	BigClockSnapLoad(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad2()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad2()
 {
 	BigClockSnapLoad(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonBigClockSnapLoad3()
+void CClock2026Dlg::OnBnClickedButtonBigClockSnapLoad3()
 {
 	BigClockSnapLoad(2);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoEntireMove()
+void CClock2026Dlg::OnBnClickedCheckLogoEntireMove()
 {
 	BOOL bEntireMove = IsDlgButtonChecked(IDC_CHECK_LOGO_ENTIRE_MOVE);
 
@@ -3312,35 +3373,35 @@ void CClock2023Dlg::OnBnClickedCheckLogoEntireMove()
 
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoMove()
+void CClock2026Dlg::OnBnClickedCheckLogoMove()
 {
 	m_pStatus->LogoConf()->LogoMove(IsDlgButtonChecked(IDC_CHECK_LOGO_MOVE));
 	EnableLogoWindow();
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoLiveMove()
+void CClock2026Dlg::OnBnClickedCheckLogoLiveMove()
 {
 	m_pStatus->LogoConf()->LiveMove(IsDlgButtonChecked(IDC_CHECK_LOGO_LIVE_MOVE));
 	EnableLogoWindow();
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoUhdMove()
+void CClock2026Dlg::OnBnClickedCheckLogoUhdMove()
 {
 	m_pStatus->LogoConf()->UHDMove(IsDlgButtonChecked(IDC_CHECK_LOGO_UHD_MOVE));
 	EnableLogoWindow();
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoDongsiMove()
+void CClock2026Dlg::OnBnClickedCheckLogoDongsiMove()
 {
 	m_pStatus->LogoConf()->DongSiMove(IsDlgButtonChecked(IDC_CHECK_LOGO_DONGSI_MOVE));
 	EnableLogoWindow();
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoEntireShow()
+void CClock2026Dlg::OnBnClickedCheckLogoEntireShow()
 {
 	BOOL bEntireShow = IsDlgButtonChecked(IDC_CHECK_LOGO_ENTIRE_SHOW);
 
@@ -3351,7 +3412,7 @@ void CClock2023Dlg::OnBnClickedCheckLogoEntireShow()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoShow()
+void CClock2026Dlg::OnBnClickedCheckLogoShow()
 {
 	m_pStatus->LogoConf()->LogoShow(IsDlgButtonChecked(IDC_CHECK_LOGO_SHOW));
 
@@ -3361,7 +3422,7 @@ void CClock2023Dlg::OnBnClickedCheckLogoShow()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoLiveShow()
+void CClock2026Dlg::OnBnClickedCheckLogoLiveShow()
 {
 	m_pStatus->LogoConf()->LiveShow(IsDlgButtonChecked(IDC_CHECK_LOGO_LIVE_SHOW));
 
@@ -3371,7 +3432,7 @@ void CClock2023Dlg::OnBnClickedCheckLogoLiveShow()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoUhdShow()
+void CClock2026Dlg::OnBnClickedCheckLogoUhdShow()
 {
 	m_pStatus->LogoConf()->UHDShow(IsDlgButtonChecked(IDC_CHECK_LOGO_UHD_SHOW));
 
@@ -3381,7 +3442,7 @@ void CClock2023Dlg::OnBnClickedCheckLogoUhdShow()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedCheckLogoDongsiShow()
+void CClock2026Dlg::OnBnClickedCheckLogoDongsiShow()
 {
 	m_pStatus->LogoConf()->DongSiShow(IsDlgButtonChecked(IDC_CHECK_LOGO_DONGSI_SHOW));
 
@@ -3391,7 +3452,7 @@ void CClock2023Dlg::OnBnClickedCheckLogoDongsiShow()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioLogoKbs1()
+void CClock2026Dlg::OnBnClickedRadioLogoKbs1()
 {
 	m_pStatus->LogoConf()->KBSLogo(FROM_E<STATION_LOGO>(STATION_LOGO::KBS_1));
 
@@ -3402,7 +3463,7 @@ void CClock2023Dlg::OnBnClickedRadioLogoKbs1()
 
 }
 
-void CClock2023Dlg::OnBnClickedRadioLogoKbs2()
+void CClock2026Dlg::OnBnClickedRadioLogoKbs2()
 {
 	m_pStatus->LogoConf()->KBSLogo(FROM_E<STATION_LOGO>(STATION_LOGO::KBS_2));
 
@@ -3412,7 +3473,7 @@ void CClock2023Dlg::OnBnClickedRadioLogoKbs2()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioLogoKbsLocal()
+void CClock2026Dlg::OnBnClickedRadioLogoKbsLocal()
 {
 	m_pStatus->LogoConf()->KBSLogo(FROM_E<STATION_LOGO>(STATION_LOGO::KBS_LOCAL));
 
@@ -3422,7 +3483,7 @@ void CClock2023Dlg::OnBnClickedRadioLogoKbsLocal()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioLogoKbsAnimation()
+void CClock2026Dlg::OnBnClickedRadioLogoKbsAnimation()
 {
 	m_pStatus->LogoConf()->KBSLogo(FROM_E<STATION_LOGO>(STATION_LOGO::KBS_ANI));
 
@@ -3433,14 +3494,14 @@ void CClock2023Dlg::OnBnClickedRadioLogoKbsAnimation()
 
 }
 
-void CClock2023Dlg::SetPosLogoObjects(void)
+void CClock2026Dlg::SetPosLogoObjects(void)
 {
 	BOOL bEntireShow = m_pStatus->LogoConf()->EntireShow();
 
-	Point& ptLogoOffset = m_pStatus->LogoConf()->LogoOffset();
-	Point& ptLiveOffset = m_pStatus->LogoConf()->LiveOffset();
-	Point& ptUHDOffset = m_pStatus->LogoConf()->UHDOffset();
-	Point& ptDongSiOffset = m_pStatus->LogoConf()->DongSiOffset();
+	Point ptLogoOffset = m_pStatus->LogoConf()->LogoOffset();
+	Point ptLiveOffset = m_pStatus->LogoConf()->LiveOffset();
+	Point ptUHDOffset = m_pStatus->LogoConf()->UHDOffset();
+	Point ptDongSiOffset = m_pStatus->LogoConf()->DongSiOffset();
 
 	if (m_pStatus->LogoConf()->LogoShow() || bEntireShow)
 	{
@@ -3479,7 +3540,7 @@ void CClock2023Dlg::SetPosLogoObjects(void)
 	}
 }
 
-BOOL CClock2023Dlg::DisplayStationLogo(void)
+BOOL CClock2026Dlg::DisplayStationLogo(void)
 {
 
 	switch (TO_E<STATION_LOGO>(m_pStatus->LogoConf()->KBSLogo()))
@@ -3539,9 +3600,9 @@ BOOL CClock2023Dlg::DisplayStationLogo(void)
 	return TRUE;
 }
 
-UINT CClock2023Dlg::DisplayLogoThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayLogoThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_STATION_LOGO))
 	{
@@ -3551,7 +3612,7 @@ UINT CClock2023Dlg::DisplayLogoThread(LPVOID pParam)
 	return 0;
 }
 
-BOOL CClock2023Dlg::TakeOutLogo()
+BOOL CClock2026Dlg::TakeOutLogo()
 {
 	if (!m_pStatus->GetDispState(DISP_STATION_LOGO)) return FALSE;
 
@@ -3571,7 +3632,7 @@ BOOL CClock2023Dlg::TakeOutLogo()
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispStationLogo()
+void CClock2026Dlg::OnBnClickedCheckDispStationLogo()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_STATION_LOGO);
 
@@ -3606,7 +3667,7 @@ void CClock2023Dlg::OnBnClickedCheckDispStationLogo()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnEnKillfocusEditLogoMoveSize()
+void CClock2026Dlg::OnEnKillfocusEditLogoMoveSize()
 {
 	CString strBuffer;
 
@@ -3621,7 +3682,7 @@ void CClock2023Dlg::OnEnKillfocusEditLogoMoveSize()
 	SetDlgItemText(IDC_EDIT_LOGO_MOVE_SIZE, GETSTR(m_pStatus->LogoConf()->MovingSize()));
 }
 
-void CClock2023Dlg::LogoResetPos()
+void CClock2026Dlg::LogoResetPos()
 {
 	Point ptOffset(0, 0);
 
@@ -3635,144 +3696,144 @@ void CClock2023Dlg::LogoResetPos()
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoResetPos()
+void CClock2026Dlg::OnBnClickedButtonLogoResetPos()
 {
 	LogoResetPos();
 }
 
-void CClock2023Dlg::LogoMoveUp()
+void CClock2026Dlg::LogoMoveUp()
 {
 	BOOL bEntireMove = m_pStatus->LogoConf()->EntireMove();
 
 	if (m_pStatus->LogoConf()->LogoMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LogoOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LogoOffset();
 		ptOffset.Y -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LogoOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->LiveMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LiveOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LiveOffset();
 		ptOffset.Y -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LiveOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->UHDMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->UHDOffset();
+		Point ptOffset = m_pStatus->LogoConf()->UHDOffset();
 		ptOffset.Y -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->UHDOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->DongSiMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->DongSiOffset();
+		Point ptOffset = m_pStatus->LogoConf()->DongSiOffset();
 		ptOffset.Y -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->DongSiOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LogoMoveLeft()
+void CClock2026Dlg::LogoMoveLeft()
 {
 	BOOL bEntireMove = m_pStatus->LogoConf()->EntireMove();
 
 	if (m_pStatus->LogoConf()->LogoMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LogoOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LogoOffset();
 		ptOffset.X -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LogoOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->LiveMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LiveOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LiveOffset();
 		ptOffset.X -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LiveOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->UHDMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->UHDOffset();
+		Point ptOffset = m_pStatus->LogoConf()->UHDOffset();
 		ptOffset.X -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->UHDOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->DongSiMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->DongSiOffset();
+		Point ptOffset = m_pStatus->LogoConf()->DongSiOffset();
 		ptOffset.X -= m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->DongSiOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LogoMoveDown()
+void CClock2026Dlg::LogoMoveDown()
 {
 	BOOL bEntireMove = m_pStatus->LogoConf()->EntireMove();
 
 	if (m_pStatus->LogoConf()->LogoMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LogoOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LogoOffset();
 		ptOffset.Y += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LogoOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->LiveMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LiveOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LiveOffset();
 		ptOffset.Y += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LiveOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->UHDMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->UHDOffset();
+		Point ptOffset = m_pStatus->LogoConf()->UHDOffset();
 		ptOffset.Y += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->UHDOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->DongSiMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->DongSiOffset();
+		Point ptOffset = m_pStatus->LogoConf()->DongSiOffset();
 		ptOffset.Y += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->DongSiOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LogoMoveRight()
+void CClock2026Dlg::LogoMoveRight()
 {
 	BOOL bEntireMove = m_pStatus->LogoConf()->EntireMove();
 
 	if (m_pStatus->LogoConf()->LogoMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LogoOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LogoOffset();
 		ptOffset.X += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LogoOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->LiveMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->LiveOffset();
+		Point ptOffset = m_pStatus->LogoConf()->LiveOffset();
 		ptOffset.X += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->LiveOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->UHDMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->UHDOffset();
+		Point ptOffset = m_pStatus->LogoConf()->UHDOffset();
 		ptOffset.X += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->UHDOffset(ptOffset);
 	}
 
 	if (m_pStatus->LogoConf()->DongSiMove() || bEntireMove)
 	{
-		Point& ptOffset = m_pStatus->LogoConf()->DongSiOffset();
+		Point ptOffset = m_pStatus->LogoConf()->DongSiOffset();
 		ptOffset.X += m_pStatus->LogoConf()->MovingSize();
 		m_pStatus->LogoConf()->DongSiOffset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LogoMove(DIRECTION dir)
+void CClock2026Dlg::LogoMove(DIRECTION dir)
 {
 	switch (dir)
 	{
@@ -3797,27 +3858,27 @@ void CClock2023Dlg::LogoMove(DIRECTION dir)
 	SetChangeMark(TRUE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoUp()
+void CClock2026Dlg::OnBnClickedButtonLogoUp()
 {
 	LogoMove(DIRECTION::UP);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoRight()
+void CClock2026Dlg::OnBnClickedButtonLogoRight()
 {
 	LogoMove(DIRECTION::RIGHT);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoDown()
+void CClock2026Dlg::OnBnClickedButtonLogoDown()
 {
 	LogoMove(DIRECTION::DOWN);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoLeft()
+void CClock2026Dlg::OnBnClickedButtonLogoLeft()
 {
 	LogoMove(DIRECTION::LEFT);
 }
 
-void CClock2023Dlg::LogoSnapSave(INT nSnapNumber)
+void CClock2026Dlg::LogoSnapSave(INT nSnapNumber)
 {
 	CString strTitle = m_pStatus->LogoSnap(nSnapNumber).Title();
 	CInputDlg dlg(strTitle);
@@ -3832,24 +3893,24 @@ void CClock2023Dlg::LogoSnapSave(INT nSnapNumber)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapSave1()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapSave1()
 {
 	LogoSnapSave(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapSave2()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapSave2()
 {
 	LogoSnapSave(1);
 
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapSave3()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapSave3()
 {
 	LogoSnapSave(2);
 
 }
 
-void CClock2023Dlg::LogoSnapLoad(INT nSnapNumber)
+void CClock2026Dlg::LogoSnapLoad(INT nSnapNumber)
 {
 	m_pStatus->LoadLogoSnap(nSnapNumber);
 
@@ -3858,22 +3919,22 @@ void CClock2023Dlg::LogoSnapLoad(INT nSnapNumber)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapLoad1()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapLoad1()
 {
 	LogoSnapLoad(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapLoad2()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapLoad2()
 {
 	LogoSnapLoad(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLogoSnapLoad3()
+void CClock2026Dlg::OnBnClickedButtonLogoSnapLoad3()
 {
 	LogoSnapLoad(2);
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboNewsCategory()
+void CClock2026Dlg::OnCbnSelchangeComboNewsCategory()
 {
 	CString strCategory;
 
@@ -3885,7 +3946,7 @@ void CClock2023Dlg::OnCbnSelchangeComboNewsCategory()
 	}
 }
 
-BOOL CClock2023Dlg::AddNewsCategory(CString strCategory)
+BOOL CClock2026Dlg::AddNewsCategory(CString strCategory)
 {
 	if (!strCategory.Trim().IsEmpty())
 	{
@@ -3914,7 +3975,7 @@ BOOL CClock2023Dlg::AddNewsCategory(CString strCategory)
 }
 
 
-void CClock2023Dlg::OnCbnKillfocusComboNewsCategory()
+void CClock2026Dlg::OnCbnKillfocusComboNewsCategory()
 {
 	CString strCategory;
 
@@ -3923,7 +3984,7 @@ void CClock2023Dlg::OnCbnKillfocusComboNewsCategory()
 	AddNewsCategory(strCategory);
 }
 
-BOOL CClock2023Dlg::DeleteNewsCategoryFromCombo(void)
+BOOL CClock2026Dlg::DeleteNewsCategoryFromCombo(void)
 {
 	CString strCategory;
 
@@ -3957,12 +4018,12 @@ BOOL CClock2023Dlg::DeleteNewsCategoryFromCombo(void)
 
 	return TRUE;
 }
-void CClock2023Dlg::OnBnClickedButtonDeleteNewsCategoryFromCombo()
+void CClock2026Dlg::OnBnClickedButtonDeleteNewsCategoryFromCombo()
 {
 	DeleteNewsCategoryFromCombo();
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboNewsTextFont()
+void CClock2026Dlg::OnCbnSelchangeComboNewsTextFont()
 {
 	CString strFontName;
 	int nIndx = m_ComboNewsTextFont.GetCurSel();
@@ -3975,7 +4036,7 @@ void CClock2023Dlg::OnCbnSelchangeComboNewsTextFont()
 }
 
 
-void CClock2023Dlg::OnCbnKillfocusComboNewsTextFont()
+void CClock2026Dlg::OnCbnKillfocusComboNewsTextFont()
 {
 	CString strFontName;
 
@@ -3995,7 +4056,7 @@ void CClock2023Dlg::OnCbnKillfocusComboNewsTextFont()
 	
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboNewsTextSize()
+void CClock2026Dlg::OnCbnSelchangeComboNewsTextSize()
 {
 	CString strSize;
 	int nIndex = m_pComboNewsTextSize->GetCurSel();
@@ -4006,7 +4067,7 @@ void CClock2023Dlg::OnCbnSelchangeComboNewsTextSize()
 	m_RENewsData.SetSelectionSize(GETINT(strSize));
 }
 
-void CClock2023Dlg::OnCbnKillfocusComboNewsTextSize()
+void CClock2026Dlg::OnCbnKillfocusComboNewsTextSize()
 {	
 	CString strSize;
 
@@ -4034,7 +4095,7 @@ void CClock2023Dlg::OnCbnKillfocusComboNewsTextSize()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonDeleteNewsTextSizeFromCombo()
+void CClock2026Dlg::OnBnClickedButtonDeleteNewsTextSizeFromCombo()
 {
 	CString strSize;
 	
@@ -4071,7 +4132,7 @@ void CClock2023Dlg::OnBnClickedButtonDeleteNewsTextSizeFromCombo()
 	}
 }
 
-void CClock2023Dlg::OnEnKillfocusEditNewsSymbolSize()
+void CClock2026Dlg::OnEnKillfocusEditNewsSymbolSize()
 {
 	CString strSize;
 
@@ -4086,7 +4147,7 @@ void CClock2023Dlg::OnEnKillfocusEditNewsSymbolSize()
 
 }
 
-void CClock2023Dlg::OnKillfocusEditNewsHanjaSize()
+void CClock2026Dlg::OnKillfocusEditNewsHanjaSize()
 {
 	
 	CString strSize;
@@ -4101,7 +4162,7 @@ void CClock2023Dlg::OnKillfocusEditNewsHanjaSize()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::ChangeNewsTextColor(void)
+void CClock2026Dlg::ChangeNewsTextColor(void)
 {
 	COLORREF clrNewsTextColor = m_btnNewsTextColor.GetColor();
 
@@ -4110,12 +4171,12 @@ void CClock2023Dlg::ChangeNewsTextColor(void)
 	m_RENewsData.SetSelectionColor(clrNewsTextColor);
 }
 
-void CClock2023Dlg::OnBnClickedButtonNewsTextColor()
+void CClock2026Dlg::OnBnClickedButtonNewsTextColor()
 {
 	ChangeNewsTextColor();
 }
 
-void CClock2023Dlg::OnHotitemchangeButtonNewsTextColor(NMHDR* pNMHDR, LRESULT* pResult)
+void CClock2026Dlg::OnHotitemchangeButtonNewsTextColor(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	// This feature requires Internet Explorer 6 or greater.
 	// The symbol _WIN32_IE must be >= 0x0600.
@@ -4127,19 +4188,19 @@ void CClock2023Dlg::OnHotitemchangeButtonNewsTextColor(NMHDR* pNMHDR, LRESULT* p
 
 }
 
-void CClock2023Dlg::ChangeReBackColor()
+void CClock2026Dlg::ChangeReBackColor()
 {
 	COLORREF clrREBack = m_btnREBackColor.GetColor();
 
 	m_RENewsData.SetBackgroundColor(FALSE, clrREBack);
 }
 
-void CClock2023Dlg::OnBnClickedButtonReBackColor()
+void CClock2026Dlg::OnBnClickedButtonReBackColor()
 {
 	ChangeReBackColor();
 }
 
-void CClock2023Dlg::OnBnHotItemChangeButtonReBackColor(NMHDR* pNMHDR, LRESULT* pResult)
+void CClock2026Dlg::OnBnHotItemChangeButtonReBackColor(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	// This feature requires Internet Explorer 6 or greater.
 	// The symbol _WIN32_IE must be >= 0x0600.
@@ -4150,7 +4211,7 @@ void CClock2023Dlg::OnBnHotItemChangeButtonReBackColor(NMHDR* pNMHDR, LRESULT* p
 	*pResult = 0;
 }
 
-void CClock2023Dlg::UpdateREUI(BOOL bUpdate)
+void CClock2026Dlg::UpdateREUI(BOOL bUpdate)
 {
 	CHARFORMAT2 CharFormat;
 	CString strFaceName;
@@ -4163,7 +4224,7 @@ void CClock2023Dlg::UpdateREUI(BOOL bUpdate)
 	{
 		// UI로부터 값을 읽어 들여서 데이터를 업데이트한다.
 
-		CCharInfoList& newsString = m_RENewsData.GetCharInfoList();
+		CCharInfoList newsString = m_RENewsData.GetCharInfoList();
 
 		curNewsData.SetCharInfoList(newsString);
 
@@ -4208,18 +4269,18 @@ void CClock2023Dlg::UpdateREUI(BOOL bUpdate)
 	m_RENewsData.SetSelectionCharFormat(CharFormat);
 }
 
-void CClock2023Dlg::OpenLogFolder(void)
+void CClock2026Dlg::OpenLogFolder(void)
 {
 	ShellExecute(nullptr, _T("explore"), nullptr, nullptr, GetLogsDir().GetBuffer(), SW_SHOW);
 }
 
-void CClock2023Dlg::OnBnClickedButtonOpenLogFolder()
+void CClock2026Dlg::OnBnClickedButtonOpenLogFolder()
 {
 	OpenLogFolder();
 }
 
 
-void CClock2023Dlg::OpenLogFile(void)
+void CClock2026Dlg::OpenLogFile(void)
 {
 	CTime time = CTime::GetCurrentTime();
 	CString strFileName = GetLogsDir() + _T("LOG_") + time.Format(_T("%Y_%m_%d")) + _T(".Log");
@@ -4234,17 +4295,17 @@ void CClock2023Dlg::OpenLogFile(void)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonOpenLogFile()
+void CClock2026Dlg::OnBnClickedButtonOpenLogFile()
 {
 	OpenLogFile();
 }
 
-void CClock2023Dlg::OnBnClickedButtonClearLogMessage()
+void CClock2026Dlg::OnBnClickedButtonClearLogMessage()
 {
 	m_ListBoxLog.ResetContent();
 }
 
-void CClock2023Dlg::ApplyRichEditFontAndColorFromFpg(CString strFileName)
+void CClock2026Dlg::ApplyRichEditFontAndColorFromFpg(CString strFileName)
 {
 
 	if (CFileUtils::ExistFile(strFileName))
@@ -4303,7 +4364,7 @@ void CClock2023Dlg::ApplyRichEditFontAndColorFromFpg(CString strFileName)
 	}
 }
 
-void CClock2023Dlg::LoadRichEditFontAndColor(void)
+void CClock2026Dlg::LoadRichEditFontAndColor(void)
 {
 	if (m_pStatus->NewsConf()->ApplyScrollColor())
 	{
@@ -4315,7 +4376,7 @@ void CClock2023Dlg::LoadRichEditFontAndColor(void)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedCheckApplyScrollColor()
+void CClock2026Dlg::OnBnClickedCheckApplyScrollColor()
 {
 	m_pStatus->NewsConf()->ApplyScrollColor(IsDlgButtonChecked(IDC_CHECK_APPLY_SCROLL_COLOR));
 
@@ -4324,7 +4385,7 @@ void CClock2023Dlg::OnBnClickedCheckApplyScrollColor()
 	UpdateData(FALSE);
 }
 
-int CClock2023Dlg::GetHanEngMode(void)
+int CClock2026Dlg::GetHanEngMode(void)
 {
 	int nReturnCode = HANGUL_MODE;
 
@@ -4341,7 +4402,7 @@ int CClock2023Dlg::GetHanEngMode(void)
 	return nReturnCode;
 }
 
-void CClock2023Dlg::SetHangulMode(void)
+void CClock2026Dlg::SetHangulMode(void)
 {
 	// IME 한글로 셋팅
 	HIMC hIMC = ::ImmGetContext(((CWnd*)this)->m_hWnd);
@@ -4358,7 +4419,7 @@ void CClock2023Dlg::SetHangulMode(void)
 	}
 }
 
-void CClock2023Dlg::SetEnglishMode(void)
+void CClock2026Dlg::SetEnglishMode(void)
 {
 
 	// IME 영문으로 셋팅
@@ -4376,7 +4437,7 @@ void CClock2023Dlg::SetEnglishMode(void)
 	}
 }
 
-void CClock2023Dlg::OnDestroy()
+void CClock2026Dlg::OnDestroy()
 {
 	CDialogEx::OnDestroy();
 
@@ -4389,13 +4450,13 @@ void CClock2023Dlg::OnDestroy()
 	theApp.SaveSetting();
 }
 
-void CClock2023Dlg::CancelPrepareNewsScroll(void)
+void CClock2026Dlg::CancelPrepareNewsScroll(void)
 {
 	m_bPrepareNewsScroll = FALSE;
 	m_btnNewsScrollPrepare.SetColor(::GetSysColor(COLOR_BTNFACE));
 }
 
-void CClock2023Dlg::AddNewsData(CNewsData& newsData)
+void CClock2026Dlg::AddNewsData(CNewsData& newsData)
 {
 	CNewsDataList* pList = m_pStatus->GetNewsList();
 
@@ -4434,7 +4495,7 @@ void CClock2023Dlg::AddNewsData(CNewsData& newsData)
 
 }
 
-void CClock2023Dlg::ClearRichEdit()
+void CClock2026Dlg::ClearRichEdit()
 {
 	m_RENewsData.ClearImageVector();
 
@@ -4444,11 +4505,13 @@ void CClock2023Dlg::ClearRichEdit()
 	m_RENewsData.SetCharInfoList(curNewsData.GetCharInfoList());
 }
 
-void CClock2023Dlg::SendNewsDataFromRichEdit()
+void CClock2026Dlg::SendNewsDataFromRichEdit()
 {
-	CNewsData& curNewsData = m_pStatus->NewsConf()->CurNewsData();
+	CNewsData curNewsData = m_pStatus->NewsConf()->CurNewsData();
 
-	curNewsData.SetCharInfoList(m_RENewsData.GetCharInfoList());
+	CCharInfoList newsString = m_RENewsData.GetCharInfoList();
+
+	curNewsData.SetCharInfoList(newsString);
 
 	CString strData = curNewsData.GetContentString();
 
@@ -4460,7 +4523,7 @@ void CClock2023Dlg::SendNewsDataFromRichEdit()
 	ClearRichEdit();
 }
 
-LRESULT CClock2023Dlg::OnSpreadEditModeOff(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSpreadEditModeOff(WPARAM wParam, LPARAM lParam)
 {
 	UINT nID = (UINT)wParam;
 
@@ -4489,7 +4552,7 @@ LRESULT CClock2023Dlg::OnSpreadEditModeOff(WPARAM wParam, LPARAM lParam)
 	return 1;
 }
 
-void CClock2023Dlg::TrackMenuOpen(UINT nID, SS_RBUTTON* ss_rbutton)
+void CClock2026Dlg::TrackMenuOpen(UINT nID, SS_RBUTTON* ss_rbutton)
 {
 	SS_CELLCOORD RButtonCoord;
 
@@ -4524,7 +4587,7 @@ void CClock2023Dlg::TrackMenuOpen(UINT nID, SS_RBUTTON* ss_rbutton)
 }
 
 
-LRESULT CClock2023Dlg::OnSpreadRButtonClicked(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSpreadRButtonClicked(WPARAM wParam, LPARAM lParam)
 {
 
 	UINT nID = (UINT)(wParam);
@@ -4553,7 +4616,7 @@ LRESULT CClock2023Dlg::OnSpreadRButtonClicked(WPARAM wParam, LPARAM lParam)
 	return 1;
 }
 
-LRESULT CClock2023Dlg::SpreadLButtonClicked(UINT nID,INT nCol,INT nRow)
+LRESULT CClock2026Dlg::SpreadLButtonClicked(UINT nID,INT nCol,INT nRow)
 {
 	SS_CELLCOORD ss_coord;
 
@@ -4563,7 +4626,7 @@ LRESULT CClock2023Dlg::SpreadLButtonClicked(UINT nID,INT nCol,INT nRow)
   return SendMessage(SSM_CLICK, nID, reinterpret_cast<LPARAM>(&ss_coord));
 }
 
-LRESULT CClock2023Dlg::OnSpreadDBClicked(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSpreadDBClicked(WPARAM wParam, LPARAM lParam)
 {
 	UINT nID = (UINT)(wParam);
 
@@ -4593,7 +4656,7 @@ LRESULT CClock2023Dlg::OnSpreadDBClicked(WPARAM wParam, LPARAM lParam)
 }
 
 
-LRESULT CClock2023Dlg::OnSpreadLButtonClicked(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSpreadLButtonClicked(WPARAM wParam, LPARAM lParam)
 {
 	UINT nID = (UINT)(wParam);
 	SS_CELLCOORD* ss_coord = (SS_CELLCOORD*)(lParam);
@@ -4632,7 +4695,7 @@ LRESULT CClock2023Dlg::OnSpreadLButtonClicked(WPARAM wParam, LPARAM lParam)
 	return 1;
 }
 
-LRESULT CClock2023Dlg::OnSpreadComboSelChange(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnSpreadComboSelChange(WPARAM wParam, LPARAM lParam)
 {
 	UINT nID = (UINT)(wParam);
     SS_CELLCOORD* ss_coord = (SS_CELLCOORD*)(lParam);
@@ -4664,7 +4727,7 @@ LRESULT CClock2023Dlg::OnSpreadComboSelChange(WPARAM wParam, LPARAM lParam)
 }
 
 
-void CClock2023Dlg::OnSpreadSortAsc()
+void CClock2026Dlg::OnSpreadSortAsc()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4680,7 +4743,7 @@ void CClock2023Dlg::OnSpreadSortAsc()
 	}
 }
 
-void CClock2023Dlg::OnSpreadSortDesc()
+void CClock2026Dlg::OnSpreadSortDesc()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4698,7 +4761,7 @@ void CClock2023Dlg::OnSpreadSortDesc()
 	}
 }
 
-void CClock2023Dlg::OnSpreadInsertRow()
+void CClock2026Dlg::OnSpreadInsertRow()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4721,7 +4784,7 @@ void CClock2023Dlg::OnSpreadInsertRow()
 
 }
 
-void CClock2023Dlg::OnSpreadDeleteRow()
+void CClock2026Dlg::OnSpreadDeleteRow()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4744,7 +4807,7 @@ void CClock2023Dlg::OnSpreadDeleteRow()
 }
 
 
-void CClock2023Dlg::OnSpreadAllUse()
+void CClock2026Dlg::OnSpreadAllUse()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4766,7 +4829,7 @@ void CClock2023Dlg::OnSpreadAllUse()
 	}
 }
 
-void CClock2023Dlg::OnSpreadAllDeselectUse()
+void CClock2026Dlg::OnSpreadAllDeselectUse()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4788,7 +4851,7 @@ void CClock2023Dlg::OnSpreadAllDeselectUse()
 	}
 }
 
-void CClock2023Dlg::OnSpreadInvertUse()
+void CClock2026Dlg::OnSpreadInvertUse()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4810,7 +4873,7 @@ void CClock2023Dlg::OnSpreadInvertUse()
 	}
 }
 
-void CClock2023Dlg::OnSpreadClearSheet()
+void CClock2026Dlg::OnSpreadClearSheet()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4831,7 +4894,7 @@ void CClock2023Dlg::OnSpreadClearSheet()
 	}
 }
 
-void CClock2023Dlg::OnSpreadRestoreSheet()
+void CClock2026Dlg::OnSpreadRestoreSheet()
 {
 	if (m_pTrackMenuOwner != nullptr)
 	{
@@ -4853,7 +4916,7 @@ void CClock2023Dlg::OnSpreadRestoreSheet()
 }
 
 
-void CClock2023Dlg::OnSelchangeRicheditNewsData(NMHDR* pNMHDR, LRESULT* pResult)
+void CClock2026Dlg::OnSelchangeRicheditNewsData(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	SELCHANGE* pSelChange = reinterpret_cast<SELCHANGE*>(pNMHDR);
 	// TODO:  The control will not send this notification unless you override the
@@ -4882,7 +4945,7 @@ void CClock2023Dlg::OnSelchangeRicheditNewsData(NMHDR* pNMHDR, LRESULT* pResult)
 	*pResult = 0;
 }
 
-BOOL CClock2023Dlg::ImportImage()
+BOOL CClock2026Dlg::ImportImage()
 {
 	TCHAR szCurrentDirectory[MAX_PATH];
 	::GetCurrentDirectory(MAX_PATH, szCurrentDirectory);
@@ -4924,12 +4987,12 @@ BOOL CClock2023Dlg::ImportImage()
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedButtonInsertImage()
+void CClock2026Dlg::OnBnClickedButtonInsertImage()
 {
 	ImportImage();
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcutConfig()
+void CClock2026Dlg::OnBnClickedButtonImageShortcutConfig()
 {
 	CImageConfigDlg dlg;
 
@@ -4938,7 +5001,7 @@ void CClock2023Dlg::OnBnClickedButtonImageShortcutConfig()
 	UpdateImageButtons();
 }
 
-void CClock2023Dlg::InsertImageShortCut(INT nImageNumber)
+void CClock2026Dlg::InsertImageShortCut(INT nImageNumber)
 {
 	if (CFileUtils::ExistFile(m_pStatus->NewsConf()->ImageShortCut(nImageNumber)))
 	{
@@ -4971,37 +5034,37 @@ void CClock2023Dlg::InsertImageShortCut(INT nImageNumber)
 
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut1()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut1()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut2()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut2()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_2);
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut3()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut3()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_3);
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut4()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut4()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_4);
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut5()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut5()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_5);
 }
 
-void CClock2023Dlg::OnBnClickedButtonImageShortcut6()
+void CClock2026Dlg::OnBnClickedButtonImageShortcut6()
 {
 	InsertImageShortCut(IMAGE_SHORTCUT_6);
 }
 
-void CClock2023Dlg::OnBnClickedButtonNewsClear()
+void CClock2026Dlg::OnBnClickedButtonNewsClear()
 {
 	if (IDYES == MessageBox(_T("뉴스 데이터를 모두 지우시겠습니까?"), _T("경고"), MB_YESNO | MB_ICONEXCLAMATION))
 	{
@@ -5013,7 +5076,7 @@ void CClock2023Dlg::OnBnClickedButtonNewsClear()
 	}
 }
 
-void CClock2023Dlg::SpecialChar()
+void CClock2026Dlg::SpecialChar()
 {
 	TCHAR tszWindowsDirectory[MAX_PATH];
 	::GetWindowsDirectory(tszWindowsDirectory, MAX_PATH);
@@ -5027,19 +5090,19 @@ void CClock2023Dlg::SpecialChar()
 	::CreateProcess(tszFileName, nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
 }
 
-void CClock2023Dlg::OnBnClickedButtonNewsSpecialChar()
+void CClock2026Dlg::OnBnClickedButtonNewsSpecialChar()
 {
 	SpecialChar();
 }
 
-void CClock2023Dlg::OnBnClickedButtonSpellCheck()
+void CClock2026Dlg::OnBnClickedButtonSpellCheck()
 {
 	CSpellCheck dlg(this);
 	dlg.m_strContents = m_RENewsData.GetUnicodeString();
 	dlg.DoModal();
 }
 
-void CClock2023Dlg::ReloadNewsScrollTemplate(void)
+void CClock2026Dlg::ReloadNewsScrollTemplate(void)
 {
 	m_pComboNewsScrollTemplate->ResetContent();
 
@@ -5065,12 +5128,12 @@ void CClock2023Dlg::ReloadNewsScrollTemplate(void)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonReloadNewsScrollTemplate()
+void CClock2026Dlg::OnBnClickedButtonReloadNewsScrollTemplate()
 {
 	ReloadNewsScrollTemplate();
 }
 
-void CClock2023Dlg::SelectChangeNewsScrollTemplate(void)
+void CClock2026Dlg::SelectChangeNewsScrollTemplate(void)
 {
 	CString strFpgFileName;
 	
@@ -5088,12 +5151,12 @@ void CClock2023Dlg::SelectChangeNewsScrollTemplate(void)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboNewsScrollTemplate()
+void CClock2026Dlg::OnCbnSelchangeComboNewsScrollTemplate()
 {
 	SelectChangeNewsScrollTemplate();
 }
 
-void CClock2023Dlg::OnKillfocusEditNewsScrollIteration()
+void CClock2026Dlg::OnKillfocusEditNewsScrollIteration()
 {
 	CString strBuffer;
 	GetDlgItemText(IDC_EDIT_NEWS_SCROLL_ITERATION, strBuffer);
@@ -5108,7 +5171,7 @@ void CClock2023Dlg::OnKillfocusEditNewsScrollIteration()
 }
 
 
-void CClock2023Dlg::OnKillfocusEditNewsScrollItemGap()
+void CClock2026Dlg::OnKillfocusEditNewsScrollItemGap()
 {
 	CancelPrepareNewsScroll();
 
@@ -5126,7 +5189,7 @@ void CClock2023Dlg::OnKillfocusEditNewsScrollItemGap()
 }
 
 
-void CClock2023Dlg::OnKillfocusEditNewsScrollPrefixGap()
+void CClock2026Dlg::OnKillfocusEditNewsScrollPrefixGap()
 {
 	CancelPrepareNewsScroll();
 
@@ -5142,7 +5205,7 @@ void CClock2023Dlg::OnKillfocusEditNewsScrollPrefixGap()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnKillfocusEditNewsScrollSpeed()
+void CClock2026Dlg::OnKillfocusEditNewsScrollSpeed()
 {
 	CancelPrepareNewsScroll();
 
@@ -5158,8 +5221,7 @@ void CClock2023Dlg::OnKillfocusEditNewsScrollSpeed()
 	UpdateData(FALSE);
 }
 
-
-void CClock2023Dlg::ReplaceNewsData(CNewsData& NewsData, CString strLayerAlias, CString strAlias, INT nPage)
+void CClock2026Dlg::ReplaceNewsData(CNewsData& NewsData, CString strLayerAlias, CString strAlias, INT nPage)
 {
 	CCGXLayer* pLayer = m_pHDdaVinci->GetCGXLayer(strLayerAlias, nPage);
 	CCGXObject* pCloneContents = nullptr;
@@ -5183,7 +5245,19 @@ void CClock2023Dlg::ReplaceNewsData(CNewsData& NewsData, CString strLayerAlias, 
 
 		pCloneContents->SetPositionByAbsEx(nPrevXPos, m_NewsContentsCoord.nOrigY, CGX_REFERENCE_POINT_LEFTCENTER);
 
-		NewsData.ExtractTextFormat();
+		if (NewsData.HasErrorTextFormat())
+		{
+			NewsData.FixedTextFormatFromCharInfoList();
+			NewsData.MakeCharInfoListFromTextFormat();
+
+			NewsData.RefreshData();
+
+			AddNewsData(NewsData);
+		}
+		else
+		{
+			NewsData.ExtractTextFormat();
+		}
 
 		CString strContents = NewsData.GetContentString();
 
@@ -5274,16 +5348,16 @@ void CClock2023Dlg::ReplaceNewsData(CNewsData& NewsData, CString strLayerAlias, 
 
 					if (CFileUtils::ExistFile(strImageFileName))   // 이미지 파일이 존재하여야 한다.
 					{
-						CRect& rt = m_RENewsData.GetImageRect(strImageFileName);
+						CRect rt = m_RENewsData.GetImageRect(strImageFileName);
 
 						pCloneImage->Replace(strImageFileName, 1);
 
-						INT nImageHeight = rt.Height() * (static_cast<float>(newsDataBuffer.Sizes().at(0)) / 100.0f);
+						INT nImageHeight = static_cast<INT>(rt.Height() * (static_cast<float>(newsDataBuffer.Sizes().at(0)) / 100.0f));
 						INT nImageWidth = 0;
 
 						INT nImageHeightArray[1] = { nImageHeight };
 
-						nImageWidth = rt.Width() * (static_cast<FLOAT>(nImageHeight) / static_cast<FLOAT>(rt.Height()));  // 밴드높이와 같을 때의 이미지 폭을 구함
+						nImageWidth = static_cast<INT>(rt.Width() * (static_cast<FLOAT>(nImageHeight) / static_cast<FLOAT>(rt.Height())));  // 밴드높이와 같을 때의 이미지 폭을 구함
 
 						INT nImageWidthArray[1] = { nImageWidth };
 
@@ -5309,7 +5383,7 @@ void CClock2023Dlg::ReplaceNewsData(CNewsData& NewsData, CString strLayerAlias, 
 	}
 }
 
-BOOL CClock2023Dlg::DisplayNews(BOOL bFirst)
+BOOL CClock2026Dlg::DisplayNews(BOOL bFirst)
 {
 	//시간 줄이는 방법에 대해 연구
 
@@ -5539,7 +5613,7 @@ BOOL CClock2023Dlg::DisplayNews(BOOL bFirst)
 }
 
 
-BOOL CClock2023Dlg::TakeOutNews()
+BOOL CClock2026Dlg::TakeOutNews()
 {
 	if (!m_pStatus->GetDispState(DISP_NEWS)) return FALSE;
 
@@ -5563,15 +5637,15 @@ BOOL CClock2023Dlg::TakeOutNews()
 }
 
 
-UINT CClock2023Dlg::DisplayNewsThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayNewsThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_NEWS))
 	{
 		DWORD dwCurTick = GetTickCount64();
 
-		if (dwCurTick - pDlg->m_dwPrevTickDisplayNews > pDlg->m_pStatus->NewsConf()->DisplayDuration() * THOUSAND)
+		if (dwCurTick - pDlg->m_dwPrevTickDisplayNews > static_cast<ULONGLONG>(pDlg->m_pStatus->NewsConf()->DisplayDuration()) * THOUSAND)
 		{
 			pDlg->m_dwPrevTickDisplayNews = dwCurTick;
 			pDlg->DisplayNews(FALSE);
@@ -5580,7 +5654,7 @@ UINT CClock2023Dlg::DisplayNewsThread(LPVOID pParam)
 	return 0;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispNews()
+void CClock2026Dlg::OnBnClickedCheckDispNews()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_NEWS);
 
@@ -5619,7 +5693,7 @@ void CClock2023Dlg::OnBnClickedCheckDispNews()
 }
 
 
-void CClock2023Dlg::OnEnKillfocusEditNewsTime()
+void CClock2026Dlg::OnEnKillfocusEditNewsTime()
 {
 	CString strBuffer;
 	GetDlgItemText(IDC_EDIT_NEWS_DISPLAY_DURATION, strBuffer);
@@ -5634,9 +5708,9 @@ void CClock2023Dlg::OnEnKillfocusEditNewsTime()
 }
 
 
-int CClock2023Dlg::Handler(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
+int CClock2026Dlg::Handler(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(me);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(me);
 
 	if (pDlg->m_pStatus->GetDispState(DISP_NEWS_SCROLL))
 	{
@@ -5674,10 +5748,10 @@ int CClock2023Dlg::Handler(LPVOID me, CString strLayer, int effectNo, int frameI
 	return 0;
 }
 
-int CClock2023Dlg::HandlerForAge(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
+int CClock2026Dlg::HandlerForAge(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
 {
 	
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(me);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(me);
 
 	if (pDlg->m_pStatus->GetDispState(DISP_AGE) || pDlg->m_pStatus->GetDispState(DISP_AGE_NOTICE))
 	{
@@ -5709,9 +5783,9 @@ int CClock2023Dlg::HandlerForAge(LPVOID me, CString strLayer, int effectNo, int 
 	return 0;
 }
 
-int CClock2023Dlg::HandlerForInputVideo(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
+int CClock2026Dlg::HandlerForInputVideo(LPVOID me, CString strLayer, int effectNo, int frameIdx, int frameLength, int totalidx, int reversetotalidx, float* in, int* out, LPVOID pAgent)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(me);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(me);
 
 	if (pDlg->m_pHDdaVinci->GetScene(LIVE_VIDEO_PAGE_NUMBER) && pDlg->m_pStatus->GetDispState(DISP_LIVE_VIDEO))
 	{
@@ -5754,7 +5828,7 @@ int CClock2023Dlg::HandlerForInputVideo(LPVOID me, CString strLayer, int effectN
 }
 
 
-BOOL CClock2023Dlg::PrepareNewsScroll()
+BOOL CClock2026Dlg::PrepareNewsScroll()
 {
 	if (m_bPrepareNewsScroll) return TRUE;
 
@@ -5947,12 +6021,12 @@ BOOL CClock2023Dlg::PrepareNewsScroll()
 
 							pCloneImage->Replace(strImageFileName, 0);
 
-							INT nImageHeight = rt.Height() * (static_cast<FLOAT>(newsDataBuffer.Sizes().at(0)) / 100.0f);
-							INT nImageWidth = 0;
+							INT nImageHeight = static_cast<INT>(rt.Height() * (static_cast<FLOAT>(newsDataBuffer.Sizes().at(0)) / 100.0f));
+								INT nImageWidth = 0;
 
-							INT nImageHeightArray[1] = { nImageHeight };
+								INT nImageHeightArray[1] = { nImageHeight };
 
-							nImageWidth = rt.Width() * (static_cast<FLOAT>(nImageHeight) / static_cast<FLOAT>(rt.Height()));  // 밴드높이와 같을 때의 이미지 폭을 구함
+								nImageWidth = static_cast<INT>(rt.Width() * (static_cast<FLOAT>(nImageHeight) / static_cast<FLOAT>(rt.Height())));  // 밴드높이와 같을 때의 이미지 폭을 구함
 
 							INT nImageWidthArray[1] = { nImageWidth };
 
@@ -6011,7 +6085,7 @@ BOOL CClock2023Dlg::PrepareNewsScroll()
 	
 	m_pHDdaVinci->SetNoTransition(false, NEWS_PAGE_NUMBER);
 
-	m_pHDdaVinci->SetPageHandler(this, CClock2023Dlg::Handler);
+	m_pHDdaVinci->SetPageHandler(this, CClock2026Dlg::Handler);
 
 	m_pWndProgress->SetText(_T("Preparing... "));
 	m_pHDdaVinci->Prepare(NEWS_PAGE_NUMBER);
@@ -6025,9 +6099,10 @@ BOOL CClock2023Dlg::PrepareNewsScroll()
 
 	m_bPrepareNewsScroll = TRUE;
 	PrintLog(_T("Prepare를 완료하였습니다."));
+	return TRUE;
 }
 
-LRESULT CClock2023Dlg::OnNewsScrollFinish(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnNewsScrollFinish(WPARAM wParam, LPARAM lParam)
 {
 	m_pStatus->SetDispStateForPage(DISP_NEWS_SCROLL, FALSE, NEWS_PAGE_NUMBER);
 
@@ -6054,14 +6129,14 @@ LRESULT CClock2023Dlg::OnNewsScrollFinish(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-LRESULT CClock2023Dlg::OnNoticeFinish(WPARAM wParam, LPARAM lParam)
+LRESULT CClock2026Dlg::OnNoticeFinish(WPARAM wParam, LPARAM lParam)
 {
 	TakeOutNotice();
 
 	return 0;
 }
 
-void CClock2023Dlg::OnBnClickedCheckPrepareNewsScroll()
+void CClock2026Dlg::OnBnClickedCheckPrepareNewsScroll()
 {
 	m_bPrepareNewsScroll = PrepareNewsScroll();
 
@@ -6069,7 +6144,7 @@ void CClock2023Dlg::OnBnClickedCheckPrepareNewsScroll()
 }
 
 
-BOOL CClock2023Dlg::TakeInNewsScroll(void)
+BOOL CClock2026Dlg::TakeInNewsScroll(void)
 {
 	if (m_pStatus->IsOnAir())
 	{
@@ -6078,7 +6153,7 @@ BOOL CClock2023Dlg::TakeInNewsScroll(void)
 		return FALSE;
 	}
 
-	if (!m_pStatus->GetNewsList()->HaveAvailableData())
+	if (!m_pStatus->GetNewsList()->HasAvailableData())
 	{
 		PrintLog(_T("송출할 데이터가 없습니다!"), _T("경고"), TRUE);
 		m_pStatus->SetDispStateForPage(DISP_NEWS_SCROLL, FALSE, NEWS_PAGE_NUMBER);
@@ -6098,7 +6173,7 @@ BOOL CClock2023Dlg::TakeInNewsScroll(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::TakeOutNewsScroll(BOOL bPrepare)
+BOOL CClock2026Dlg::TakeOutNewsScroll(BOOL bPrepare)
 {
 	if (!m_pStatus->GetDispState(DISP_NEWS_SCROLL)) return FALSE;
 
@@ -6107,7 +6182,7 @@ BOOL CClock2023Dlg::TakeOutNewsScroll(BOOL bPrepare)
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispNewsScroll()
+void CClock2026Dlg::OnBnClickedCheckDispNewsScroll()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_NEWS_SCROLL);
 
@@ -6125,14 +6200,15 @@ void CClock2023Dlg::OnBnClickedCheckDispNewsScroll()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::LoadWeatherCity()
+void CClock2026Dlg::LoadWeatherCity()
 {
-	m_pStatus->GetWeatherList()->UpdateSelectCity(m_pStatus->WeatherConf()->MapCode_SelectCity());
+	auto cities = m_pStatus->WeatherConf()->MapCode_SelectCity();
+	m_pStatus->GetWeatherList()->UpdateSelectCity(cities);
 	
 	m_SpreadWeather.UpdateDataSpread(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonWeatherCitySelect()
+void CClock2026Dlg::OnBnClickedButtonWeatherCitySelect()
 {
 	CWeatherSelectDlg dlg;
 
@@ -6144,16 +6220,16 @@ void CClock2023Dlg::OnBnClickedButtonWeatherCitySelect()
 	}
 }
 
-void CClock2023Dlg::UpdateWeatherTime(void)
+void CClock2026Dlg::UpdateWeatherTime(void)
 {
 	CString strBuffer;
 
-	strBuffer = m_pStatus->GetWeatherList()->TimeReadWeather().Format(_T("%Y년 %m월 %d일 %H시 %M분 데이터"));
+	strBuffer = m_pStatus->GetWeatherList()->GetTimeReadWeatherAndAir().Format(_T("%Y년 %m월 %d일 %H시 %M분 데이터"));
 
 	SetDlgItemText(IDC_STATIC_WEATHER_TIME, strBuffer);
 }
 
-HBRUSH CClock2023Dlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
+HBRUSH CClock2026Dlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
 	HBRUSH hbr = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
 
@@ -6167,7 +6243,7 @@ HBRUSH CClock2023Dlg::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 	return hbr;
 }
 
-void CClock2023Dlg::GetWeatherAndAirData(void)
+void CClock2026Dlg::GetWeatherAndAirData(void)
 {
 	GetDlgItem(IDC_BUTTON_GET_KBS_WEATHER)->EnableWindow(FALSE);
 
@@ -6179,39 +6255,57 @@ void CClock2023Dlg::GetWeatherAndAirData(void)
 	{
 		PrintLog(_T("KBS 재난정보시스템 날씨를 읽기 시작합니다."));
 
-		if (m_pStatus->GetWeatherList()->RefreshWeatherAndAirData(true))
+		CTime CurTime = CTime::GetCurrentTime();
+
+		if (GETTIMESPAN(m_pStatus->GetWeatherList()->GetTimeReadWeatherAndAir(), CurTime).GetTotalSeconds() < 10) // 데이터 읽은지 10분 미만이면 그냥 통과 마진 5초
 		{
-			PrintLog(_T("날씨와 미세먼지 정보를 읽었습니다."));
-			UpdateWeatherTime();
-			SetChangeMark(TRUE);
+			PrintLog_Message(_T("기상 데이터 읽은 후 10초 지나야 가능합니다!"), TRUE);
+			GetDlgItem(IDC_BUTTON_GET_KBS_WEATHER)->EnableWindow(TRUE);
+			return;
 		}
 
-		m_SpreadWeather.UpdateDataSpread(FALSE);
+		BOOL bExceptAir = m_pStatus->WeatherConf()->ExceptAir();
+		if (m_pStatus->GetWeatherList()->RefreshWeatherAndAirData(true,bExceptAir))
+		{
+			if (bExceptAir)
+			{
+				PrintLog(_T("날씨 정보를 읽었습니다."));
+			}
+			else
+			{
+				PrintLog(_T("날씨와 미세먼지 정보를 읽었습니다."));
+			}
+
+			m_pStatus->GetWeatherList()->SetTimeReadWeatherAndAir(CTime::GetCurrentTime());
+			UpdateWeatherTime();
+			SetChangeMark(TRUE);
+
+			m_SpreadWeather.UpdateDataSpread(FALSE);
+		}
 	}
 
 	GetDlgItem(IDC_BUTTON_GET_KBS_WEATHER)->EnableWindow(TRUE);
 }
 
-BOOL CClock2023Dlg::RunWeatherThread(void)
+BOOL CClock2026Dlg::RunWeatherThread(void)
 {
 	CWinThread* pThread = AfxBeginThread(AutoReadingWeatherThread, this);
 
-	if (WAIT_TIMEOUT == WaitForSingleObject(pThread->m_hThread, WAIT_TIME_FOR_WEATHER_READING))
-	{
-		PrintLog(_T("날씨 서버 Time Out"));
-		return FALSE;
-	}
+	//if (WAIT_TIMEOUT == WaitForSingleObject(pThread->m_hThread, WAIT_TIME_FOR_WEATHER_READING))
+	//{
+	//	PrintLog(_T("날씨 서버 Time Out"));
+	//	return FALSE;
+	//}
 
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedButtonGetKbsWeather()
+void CClock2026Dlg::OnBnClickedButtonGetKbsWeather()
 {
-	GetDlgItem(IDC_BUTTON_GET_KBS_WEATHER)->EnableWindow(FALSE);
 	RunWeatherThread();
 }
 
-void CClock2023Dlg::OnBnClickedButtonClearWeatherData()
+void CClock2026Dlg::OnBnClickedButtonClearWeatherData()
 {
 	m_pStatus->GetWeatherList()->ClearWeatherAndAirData();
 	m_SpreadWeather.UpdateDataSpread(FALSE);
@@ -6219,7 +6313,7 @@ void CClock2023Dlg::OnBnClickedButtonClearWeatherData()
 }
 
 
-void CClock2023Dlg::OnBnClickedButtonClearAllWeatherData()
+void CClock2026Dlg::OnBnClickedButtonClearAllWeatherData()
 {
 	m_pStatus->GetWeatherList()->DeleteAllData();
 	m_SpreadWeather.UpdateDataSpread(FALSE);
@@ -6228,9 +6322,9 @@ void CClock2023Dlg::OnBnClickedButtonClearAllWeatherData()
 }
 
 
-UINT CClock2023Dlg::AutoReadingWeatherThread(LPVOID lpvoid)
+UINT CClock2026Dlg::AutoReadingWeatherThread(LPVOID lpvoid)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(lpvoid);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(lpvoid);
 
 	if (!IsInternetConnected())
 	{
@@ -6250,7 +6344,7 @@ UINT CClock2023Dlg::AutoReadingWeatherThread(LPVOID lpvoid)
 	return 0;
 }
 
-void CClock2023Dlg::ConfigTimerForAutoReadingWeather(BOOL bAutoReading)
+void CClock2026Dlg::ConfigTimerForAutoReadingWeather(BOOL bAutoReading)
 {
 
 	if (bAutoReading)
@@ -6267,7 +6361,7 @@ void CClock2023Dlg::ConfigTimerForAutoReadingWeather(BOOL bAutoReading)
 	m_pStatus->WeatherConf()->AutoReading(bAutoReading);	
 }
 
-void CClock2023Dlg::OnBnClickedCheckAutoWeatherReading()
+void CClock2026Dlg::OnBnClickedCheckAutoWeatherReading()
 {
 	BOOL bAutoReading = IsDlgButtonChecked(IDC_CHECK_AUTO_WEATHER_READING);
 
@@ -6277,7 +6371,7 @@ void CClock2023Dlg::OnBnClickedCheckAutoWeatherReading()
 }
 
 
-void CClock2023Dlg::OnEnKillfocusEditAutoReadingWeatherPeriodMin()
+void CClock2026Dlg::OnEnKillfocusEditAutoReadingWeatherPeriodMin()
 {
 	INT nOld = m_pStatus->WeatherConf()->AutoReadingPeriod();
 
@@ -6301,7 +6395,7 @@ void CClock2023Dlg::OnEnKillfocusEditAutoReadingWeatherPeriodMin()
 }
 
 
-BOOL CClock2023Dlg::DisplayWeather(BOOL bFirst)
+BOOL CClock2026Dlg::DisplayWeather(BOOL bFirst)
 {
 	BOOL bResult = TRUE;
 
@@ -6401,7 +6495,7 @@ BOOL CClock2023Dlg::DisplayWeather(BOOL bFirst)
 	}
 
 
-	CWeatherData& weatherData = m_pStatus->GetWeatherList()->GetAt(m_nCurWeather);
+	CWeatherData weatherData = m_pStatus->GetWeatherList()->GetAt(m_nCurWeather);
 
 	while (!weatherData.IsAvailable())
 	{
@@ -6426,7 +6520,7 @@ BOOL CClock2023Dlg::DisplayWeather(BOOL bFirst)
 		m_pWeatherObject[FROM_E(WEATHER_OBJECTS::DUST_GRADE)]->Replace(weatherData.GetDustGradeFileName(), FALSE);
 		m_pWeatherObject[FROM_E(WEATHER_OBJECTS::DUST_CONCENTRATION)]->Replace(weatherData.GetValue(WEATHER_FIELD_INDEX::PM25AVG), FALSE);
 
-		INT nSolidColor[2] = { 0,weatherData.GetDustColor() };
+		INT nSolidColor[2] = { 0, static_cast<INT>(weatherData.GetDustColor()) };
 
 		m_pHDdaVinci->SetProperty(m_pWeatherObject[FROM_E(WEATHER_OBJECTS::DUST_CONCENTRATION)], CGX_PROPERTY_COLOR_SOLID, nSolidColor, 2);
 
@@ -6473,7 +6567,7 @@ BOOL CClock2023Dlg::DisplayWeather(BOOL bFirst)
 	return bResult;
 }
 
-BOOL CClock2023Dlg::TakeOutWeather(void)
+BOOL CClock2026Dlg::TakeOutWeather(void)
 {
 	if (!m_pStatus->GetDispState(DISP_WEATHER)) return FALSE;
 
@@ -6492,9 +6586,9 @@ BOOL CClock2023Dlg::TakeOutWeather(void)
 	return TRUE;
 }
 
-UINT CClock2023Dlg::DisplayWeatherThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayWeatherThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_WEATHER))
 	{
@@ -6510,7 +6604,7 @@ UINT CClock2023Dlg::DisplayWeatherThread(LPVOID pParam)
 	return 0;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispWeather()
+void CClock2026Dlg::OnBnClickedCheckDispWeather()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_WEATHER);
 
@@ -6544,7 +6638,7 @@ void CClock2023Dlg::OnBnClickedCheckDispWeather()
 
 }
 
-void CClock2023Dlg::OnBnClickedButtonWeatherMoveUp()
+void CClock2026Dlg::OnBnClickedButtonWeatherMoveUp()
 {
 	CWeatherDataList* pList = m_pStatus->GetWeatherList();
 
@@ -6558,7 +6652,7 @@ void CClock2023Dlg::OnBnClickedButtonWeatherMoveUp()
 	m_SpreadWeather.DrawSelectionForCurIndex();
 }
 
-void CClock2023Dlg::OnBnClickedButtonWeatherMoveDown()
+void CClock2026Dlg::OnBnClickedButtonWeatherMoveDown()
 {
 	CWeatherDataList* pList = m_pStatus->GetWeatherList();
 
@@ -6573,7 +6667,7 @@ void CClock2023Dlg::OnBnClickedButtonWeatherMoveDown()
 }
 
 
-void CClock2023Dlg::OnBnClickedButtonNewsMoveUp()
+void CClock2026Dlg::OnBnClickedButtonNewsMoveUp()
 {
 	CNewsDataList* pList = m_pStatus->GetNewsList();
 
@@ -6587,7 +6681,7 @@ void CClock2023Dlg::OnBnClickedButtonNewsMoveUp()
 	m_SpreadNews.DrawSelectionForCurIndex();
 }
 
-void CClock2023Dlg::OnBnClickedButtonNewsMoveDown()
+void CClock2026Dlg::OnBnClickedButtonNewsMoveDown()
 {
 	CNewsDataList* pList = m_pStatus->GetNewsList();
 
@@ -6601,17 +6695,17 @@ void CClock2023Dlg::OnBnClickedButtonNewsMoveDown()
 	m_SpreadNews.DrawSelectionForCurIndex();
 }
 
-void CClock2023Dlg::ReloadNoticeTemplate(void)
+void CClock2026Dlg::ReloadNoticeTemplate(void)
 {
 	m_SpreadNotice.RefreshTemplateFiles();
 }
 
-void CClock2023Dlg::OnBnClickedButtonReloadNoticeTemplate()
+void CClock2026Dlg::OnBnClickedButtonReloadNoticeTemplate()
 {
 	ReloadNoticeTemplate();
 }
 
-BOOL CClock2023Dlg::SelectNotice(CNoticeData& noticeData)
+BOOL CClock2026Dlg::SelectNotice(CNoticeData& noticeData)
 {
 	CString strFpgFile = noticeData.GetValue(NOTICE_FIELD_INDEX::TEMPLATE);
 
@@ -6619,7 +6713,7 @@ BOOL CClock2023Dlg::SelectNotice(CNoticeData& noticeData)
 	{
 		DrawPreview(m_PreviewNotice, strFpgFile);
 	}
-
+	
 	m_SpreadAlias.SetNoticeData(noticeData);
 
 	m_SpreadAlias.UpdateDataSheet(FALSE, TRUE);
@@ -6629,7 +6723,7 @@ BOOL CClock2023Dlg::SelectNotice(CNoticeData& noticeData)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::ClearNotice(CNoticeData& noticeData)
+BOOL CClock2026Dlg::ClearNotice(CNoticeData& noticeData)
 {
 	noticeData.Clear();
 
@@ -6642,7 +6736,7 @@ BOOL CClock2023Dlg::ClearNotice(CNoticeData& noticeData)
 	return TRUE;
 }
 
-void CClock2023Dlg::ApplyNotice(void)
+void CClock2026Dlg::ApplyNotice(void)
 {
 	m_CurNoticeData = m_SpreadAlias.GetNoticeData();
 
@@ -6658,18 +6752,18 @@ void CClock2023Dlg::ApplyNotice(void)
 	}
 }
 
-LRESULT CClock2023Dlg::OnApplyNotice(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0 */)
+LRESULT CClock2026Dlg::OnApplyNotice(WPARAM wParam /* = 0 */, LPARAM lParam /* = 0 */)
 {
 	ApplyNotice();
 	return 0;
 }
 
-void CClock2023Dlg::OnBnClickedButtonApplyNotice()
+void CClock2026Dlg::OnBnClickedButtonApplyNotice()
 {
 	ApplyNotice();
 }
 
-void CClock2023Dlg::OnBnClickedRadioAgeAll()
+void CClock2026Dlg::OnBnClickedRadioAgeAll()
 {
 	m_pStatus->NoticeConf()->AgeMode(AGE_ALL);
 	PrintLog(_T("전체 연령 고지 선택"));
@@ -6678,7 +6772,7 @@ void CClock2023Dlg::OnBnClickedRadioAgeAll()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioAge7()
+void CClock2026Dlg::OnBnClickedRadioAge7()
 {
 	m_pStatus->NoticeConf()->AgeMode(AGE_7);
 	PrintLog(_T("연령 고지 7세 선택"));
@@ -6686,7 +6780,7 @@ void CClock2023Dlg::OnBnClickedRadioAge7()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioAge12()
+void CClock2026Dlg::OnBnClickedRadioAge12()
 {
 	m_pStatus->NoticeConf()->AgeMode(AGE_12);
 	PrintLog(_T("연령 고지 12세 선택"));
@@ -6694,7 +6788,7 @@ void CClock2023Dlg::OnBnClickedRadioAge12()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioAge15()
+void CClock2026Dlg::OnBnClickedRadioAge15()
 {
 	m_pStatus->NoticeConf()->AgeMode(AGE_15);
 	PrintLog(_T("연령 고지 15세 선택"));
@@ -6702,7 +6796,7 @@ void CClock2023Dlg::OnBnClickedRadioAge15()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedRadioAge19()
+void CClock2026Dlg::OnBnClickedRadioAge19()
 {
 	m_pStatus->NoticeConf()->AgeMode(AGE_19);
 	PrintLog(_T("연령 고지 19세 선택"));
@@ -6710,7 +6804,7 @@ void CClock2023Dlg::OnBnClickedRadioAge19()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::EnableClockWindow()
+void CClock2026Dlg::EnableClockWindow()
 {
 	BOOL bEntireMove = m_pStatus->ClockConf()->EntireMove();
 	BOOL bMoveEnable = m_pStatus->ClockConf()->MoveEnable();
@@ -6732,7 +6826,7 @@ void CClock2023Dlg::EnableClockWindow()
 
 }
 
-void CClock2023Dlg::EnableBigClockWindow(void)
+void CClock2026Dlg::EnableBigClockWindow(void)
 {
 	BOOL bVal = m_pStatus->BigClockConf()->MoveEnable();
 
@@ -6746,7 +6840,7 @@ void CClock2023Dlg::EnableBigClockWindow(void)
 	GetDlgItem(IDC_BUTTON_BIG_CLOCK_SNAP_LOAD_3)->EnableWindow(bVal);
 }
 
-void CClock2023Dlg::EnableLogoWindow(void)
+void CClock2026Dlg::EnableLogoWindow(void)
 {
 	BOOL bKBSLogoAni = m_pStatus->LogoConf()->IsAnimationLogo();
 
@@ -6803,14 +6897,14 @@ void CClock2023Dlg::EnableLogoWindow(void)
 
 }
 
-void CClock2023Dlg::EnableManualUpWindow(void)
+void CClock2026Dlg::EnableManualUpWindow(void)
 {
 	BOOL bDisp = m_pStatus->GetDispState(DISP_MANUALUP);
 
 	GetDlgItem(IDC_BUTTON_RELOAD_MANUALUP_TEMPLATE)->EnableWindow(!bDisp);
 }
 
-void CClock2023Dlg::EnableAgeWindow(BOOL bChecked)
+void CClock2026Dlg::EnableAgeWindow(BOOL bChecked)
 {
 	GetDlgItem(IDC_RADIO_AGE_ALL)->EnableWindow(!bChecked);
 	GetDlgItem(IDC_RADIO_AGE_7)->EnableWindow(!bChecked);
@@ -6819,7 +6913,7 @@ void CClock2023Dlg::EnableAgeWindow(BOOL bChecked)
 	GetDlgItem(IDC_RADIO_AGE_19)->EnableWindow(!bChecked);
 }
 
-void CClock2023Dlg::EnableNoticeWindow(BOOL bChecked)
+void CClock2026Dlg::EnableNoticeWindow(BOOL bChecked)
 {
 	GetDlgItem(IDC_SPREAD_NOTICE)->EnableWindow(!bChecked);
 	GetDlgItem(IDC_BUTTON_NOTICE_MOVE_UP)->EnableWindow(!bChecked);
@@ -6832,7 +6926,7 @@ void CClock2023Dlg::EnableNoticeWindow(BOOL bChecked)
 	GetDlgItem(IDC_SPREAD_ALIAS)->EnableWindow(!bChecked);
 }
 
-void CClock2023Dlg::EnableLiveVideoWindow(BOOL bChecked)
+void CClock2026Dlg::EnableLiveVideoWindow(BOOL bChecked)
 {
 	GetDlgItem(IDC_COMBO_LIVE_VIDEO_TEMPLATES)->EnableWindow(!bChecked);
 	GetDlgItem(IDC_BUTTON_RELOAD_LIVE_VIDEO_TEMPLATE)->EnableWindow(!bChecked);
@@ -6847,7 +6941,7 @@ void CClock2023Dlg::EnableLiveVideoWindow(BOOL bChecked)
 	GetDlgItem(IDC_BUTTON_LIVE_VIDEO_SNAP_LOAD_3)->EnableWindow(!bChecked);
 }
 
-void CClock2023Dlg::EnableWeatherWindow(BOOL bChecked)
+void CClock2026Dlg::EnableWeatherWindow(BOOL bChecked)
 {
 	GetDlgItem(IDC_BUTTON_GET_KBS_WEATHER)->EnableWindow(!bChecked);
 	GetDlgItem(IDC_BUTTON_WEATHER_CITY_SELECT)->EnableWindow(!bChecked);
@@ -6859,7 +6953,7 @@ void CClock2023Dlg::EnableWeatherWindow(BOOL bChecked)
 	GetDlgItem(IDC_SPREAD_WEATHER)->EnableWindow(!bChecked);
 }
 
-void CClock2023Dlg::EnableNewsScrollWindow(BOOL bChecked)
+void CClock2026Dlg::EnableNewsScrollWindow(BOOL bChecked)
 {
 	GetDlgItem(IDC_COMBO_NEWS_SCROLL_TEMPLATE)->EnableWindow(!bChecked);
 	GetDlgItem(IDC_BUTTON_RELOAD_NEWS_SCROLL_TEMPLATE)->EnableWindow(!bChecked);
@@ -6870,7 +6964,7 @@ void CClock2023Dlg::EnableNewsScrollWindow(BOOL bChecked)
 	GetDlgItem(IDC_EDIT_NEWS_SCROLL_ITEM_GAP)->EnableWindow(!bChecked);
 }
 
-void CClock2023Dlg::EnableNewsWindow(BOOL bChecked)
+void CClock2026Dlg::EnableNewsWindow(BOOL bChecked)
 {
 	INT nShow = bChecked ? SW_HIDE : SW_SHOW;
 
@@ -6906,7 +7000,7 @@ void CClock2023Dlg::EnableNewsWindow(BOOL bChecked)
 
 }
 
-void CClock2023Dlg::EnableWindow(UINT nID,BOOL bChecked)
+void CClock2026Dlg::EnableWindow(UINT nID,BOOL bChecked)
 {
 	switch (nID)
 	{
@@ -6993,13 +7087,13 @@ void CClock2023Dlg::EnableWindow(UINT nID,BOOL bChecked)
 	if(nID != 0) GetDlgItem(nID)->SetFocus();
 }
 
-BOOL CClock2023Dlg::DispAge(void)
+BOOL CClock2026Dlg::DispAge(void)
 {
 	CalcAgeShow();
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::StartAge(BOOL bOnlyAge)
+BOOL CClock2026Dlg::StartAge(BOOL bOnlyAge)
 {
 	CString strFpgFileName = _T("연령");
 
@@ -7038,7 +7132,7 @@ BOOL CClock2023Dlg::StartAge(BOOL bOnlyAge)
 		}
 	}
 
-	m_pHDdaVinci->SetPageHandler(this, CClock2023Dlg::HandlerForAge);
+	m_pHDdaVinci->SetPageHandler(this, CClock2026Dlg::HandlerForAge);
 
 	m_pHDdaVinci->GetScene(AGE_PAGE_NUMBER)->Prepare(AGE_PAGE_NUMBER);
 	m_pHDdaVinci->SetScene(AGE_PAGE_NUMBER, m_pHDdaVinci->GetScene(AGE_PAGE_NUMBER), 0);
@@ -7047,7 +7141,7 @@ BOOL CClock2023Dlg::StartAge(BOOL bOnlyAge)
 	return TRUE;
 }
 
-void CClock2023Dlg::SetAgeImageFile(CCGXObject* pObject)
+void CClock2026Dlg::SetAgeImageFile(CCGXObject* pObject)
 {
 	if (pObject == nullptr) return;
 
@@ -7070,7 +7164,7 @@ void CClock2023Dlg::SetAgeImageFile(CCGXObject* pObject)
 
 }
 
-void CClock2023Dlg::SetAgePos(CCGXObject* pObject)
+void CClock2026Dlg::SetAgePos(CCGXObject* pObject)
 {
 	if (pObject != nullptr)
 	{
@@ -7083,7 +7177,7 @@ void CClock2023Dlg::SetAgePos(CCGXObject* pObject)
 	}
 }
 
-void CClock2023Dlg::DrawAgeTime(CWnd* pWnd, CString strAgeTime)
+void CClock2026Dlg::DrawAgeTime(CWnd* pWnd, CString strAgeTime)
 {
 	CClientDC dc(pWnd);
 	CDC memDC;
@@ -7114,7 +7208,7 @@ void CClock2023Dlg::DrawAgeTime(CWnd* pWnd, CString strAgeTime)
 
 }
 
-BOOL CClock2023Dlg::CalcAgeShow(void)
+BOOL CClock2026Dlg::CalcAgeShow(void)
 {
 	if (!m_bUseAge)
 	{
@@ -7126,7 +7220,7 @@ BOOL CClock2023Dlg::CalcAgeShow(void)
 
 	CTimeSpan timeSpanAge = GETTIMESPAN(m_timeAgeStart, CTime::GetCurrentTime());
 
-	INT nTotalSeconds = timeSpanAge.GetTotalSeconds();
+	INT nTotalSeconds = static_cast<INT>(timeSpanAge.GetTotalSeconds());
 
 	switch (m_pStatus->NoticeConf()->AgeMode())
 	{
@@ -7147,11 +7241,13 @@ BOOL CClock2023Dlg::CalcAgeShow(void)
 		{
 			if (m_bAgeShow)
 			{
-				PrintLog( _T("번째 타이머에 의한 연령고지 표시"));
+				PrintLog( _T("타이머에 의한 연령고지 표시"));
 			}
 			else
 			{
 				PrintLog(_T("타이머에 의한 연령고지 휴지시간"));
+
+				SetDlgItemText(IDC_STATIC_AGE_TIMER_STOP, CTime::GetCurrentTime().Format(_T("%H:%M:%S")));
 			}
 		}
 		break;
@@ -7184,7 +7280,7 @@ BOOL CClock2023Dlg::CalcAgeShow(void)
 	return m_bAgeShow;
 }
 
-BOOL CClock2023Dlg::SearchAndModifyFileName(CString& strFileName, CString strPath)
+BOOL CClock2026Dlg::SearchAndModifyFileName(CString& strFileName, CString strPath)
 {
 	CString strModifyFileName;
 
@@ -7205,7 +7301,7 @@ BOOL CClock2023Dlg::SearchAndModifyFileName(CString& strFileName, CString strPat
 	return TRUE;
 }
 
-void CClock2023Dlg::OnEnKillfocusEditNoticeRepetition()
+void CClock2026Dlg::OnEnKillfocusEditNoticeRepetition()
 {
 	CString strBuffer;
 	GetDlgItemText(IDC_EDIT_NOTICE_REPETITION, strBuffer);
@@ -7218,7 +7314,7 @@ void CClock2023Dlg::OnEnKillfocusEditNoticeRepetition()
 	UpdateData(FALSE);
 }
 
-BOOL CClock2023Dlg::StartDisplayNotice(BOOL bUseAge)
+BOOL CClock2026Dlg::StartDisplayNotice(BOOL bUseAge)
 {
 	m_bUseAge = bUseAge;
 
@@ -7235,9 +7331,9 @@ BOOL CClock2023Dlg::StartDisplayNotice(BOOL bUseAge)
 	return TRUE;
 }
 
-UINT CClock2023Dlg::DisplayNoticeThread(LPVOID pParam)
+UINT CClock2026Dlg::DisplayNoticeThread(LPVOID pParam)
 {
-	CClock2023Dlg* pDlg = reinterpret_cast<CClock2023Dlg*>(pParam);
+	CClock2026Dlg* pDlg = reinterpret_cast<CClock2026Dlg*>(pParam);
 
 	while (pDlg->m_pStatus->GetDispState(DISP_AGE_NOTICE) || pDlg->m_pStatus->GetDispState(DISP_NOTICE))
 	{
@@ -7247,16 +7343,29 @@ UINT CClock2023Dlg::DisplayNoticeThread(LPVOID pParam)
 	return 0;
 }
 
-BOOL CClock2023Dlg::DisplayNotice(BOOL bFirst)
+BOOL CClock2026Dlg::DisplayNotice(BOOL bFirst)
 {
-	if (m_bUseAge) CalcAgeShow();
+	CNoticeDataList* pList = m_pStatus->GetNoticeList();
+
+	if (m_bUseAge)
+	{
+		if (bFirst)
+		{
+			CString strFpg;
+			if (!pList->HasNoAgeNotice(m_pHDdaVinci, strFpg))
+			{
+				PrintLog(strFpg + CString(_T("연령 알리아스가 없습니다.")), _T("오류"), TRUE);
+				return FALSE;
+			}
+		}
+
+		CalcAgeShow();
+	}
 
 	if (m_pHDdaVinci->IsTransmitting(NOTICE_PAGE_NUMBER)) return FALSE;
-	
-  	CNoticeDataList* pList = m_pStatus->GetNoticeList();
 
 	int nDataCount = pList->Size();
-	BOOL bUseExist = pList->HaveAvailableData();
+	BOOL bUseExist = pList->HasAvailableData();
 
 	if (!bUseExist || nDataCount == 0)
 	{
@@ -7264,7 +7373,7 @@ BOOL CClock2023Dlg::DisplayNotice(BOOL bFirst)
 		return FALSE;
 	}
 
-	CNoticeData& noticeData = pList->GetAt(m_nCurNoticeIndex);
+	auto noticeData = pList->GetAt(m_nCurNoticeIndex);
 
 	while (!noticeData.IsAvailable())
 	{
@@ -7301,7 +7410,72 @@ BOOL CClock2023Dlg::DisplayNotice(BOOL bFirst)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::TakeInNotice(INT nIndex)
+//======== Notice CCS 5-type classification (ported from Notice2018, TakeInNotice only) ========
+enum class ECCSRelation { BEFORE, STRADDLE_BEGIN, INSIDE, STRADDLE_END, AFTER };
+
+static ECCSRelation ClassifyCCSRelation(
+	int effBegin, int effEnd, int ccsBegin, int ccsEnd)
+{
+	if (effEnd   <= ccsBegin) return ECCSRelation::BEFORE;
+	if (effBegin >= ccsEnd)   return ECCSRelation::AFTER;
+	if (effBegin <  ccsBegin) return ECCSRelation::STRADDLE_BEGIN;
+	if (effEnd   >  ccsEnd)   return ECCSRelation::STRADDLE_END;
+	return ECCSRelation::INSIDE;
+}
+
+static void AdjustEffectByCCSRelation(
+	CCGXEffect* pEff,
+	int oldCcsBegin, int oldCcsEnd,
+	int newCcsBegin, int newCcsEnd)
+{
+	int effBegin = pEff->GetBeginFrame();
+	int effEnd   = pEff->GetEndFrame();
+	int effSize  = pEff->GetFrames();
+	int oldCcsSz = oldCcsEnd - oldCcsBegin;
+	int newCcsSz = newCcsEnd - newCcsBegin;
+	int delta    = newCcsSz - oldCcsSz;
+
+	ECCSRelation rel = ClassifyCCSRelation(effBegin, effEnd, oldCcsBegin, oldCcsEnd);
+
+	switch (rel)
+	{
+	case ECCSRelation::BEFORE:
+		break;
+
+	case ECCSRelation::STRADDLE_BEGIN:
+		if (newCcsEnd < effEnd)
+			pEff->Resize(newCcsEnd - effBegin);
+		break;
+
+	case ECCSRelation::INSIDE:
+		if (newCcsSz < effSize)
+		{
+			pEff->MoveTo(newCcsBegin);
+			pEff->Resize(newCcsSz);
+		}
+		else
+		{
+			int offsetFromBegin = effBegin - oldCcsBegin;
+			pEff->MoveTo(newCcsBegin + offsetFromBegin);
+		}
+		break;
+
+	case ECCSRelation::STRADDLE_END:
+		{
+			// Always keep End-relative position (== Move(delta)); preserves original
+			// overlap, never grows coverage. Removed the B=CCS.Begin shrink branch
+			// that pulled the effect over the CCS (covering bug). delta>0 path unchanged.
+			int offsetFromEnd = effBegin - oldCcsEnd;
+			pEff->MoveTo(newCcsEnd + offsetFromEnd);
+		}
+		break;
+
+	case ECCSRelation::AFTER:
+		pEff->Move(delta);
+		break;
+	}
+}
+BOOL CClock2026Dlg::TakeInNotice(INT nIndex)
 {
 	CNoticeData noticeData = m_pStatus->GetNoticeList()->GetAt(nIndex);
 
@@ -7328,6 +7502,13 @@ BOOL CClock2023Dlg::TakeInNotice(INT nIndex)
 		{
 			PrintLog(_T("연령이 반드시 있어야 합니다."), _T("경고"), TRUE);
 			return FALSE;
+		}
+	}
+	else
+	{
+		if (pObject != nullptr)
+		{
+			pObject->SetShow(FALSE);
 		}
 	}
 
@@ -7360,7 +7541,73 @@ BOOL CClock2023Dlg::TakeInNotice(INT nIndex)
 			}
 			else
 			{
-				m_pHDdaVinci->ReplaceObject(noticeData.GetValue(ALIAS_1 + i), noticeData.GetValue(VALUE_1 + i), 0, NOTICE_PAGE_NUMBER);
+				// CCS variable-length handling: after Replace, shift surrounding
+				// effect timelines by delta using 5-type classification (Notice2018 logic).
+				CString strCCSAlias = noticeData.GetValue(ALIAS_1 + i);
+				CString strCCSValue = noticeData.GetValue(VALUE_1 + i);
+
+				CString strLayerAlias = m_pHDdaVinci->GetObjectParentLayerAlias(strCCSAlias, NOTICE_PAGE_NUMBER);
+				CCGXEffect* pLayerEff = m_pHDdaVinci->GetLayerOwnEffect(strLayerAlias, NOTICE_PAGE_NUMBER);
+				CCGXEffect* pObjEff   = m_pHDdaVinci->GetObjectOwnEffect(strCCSAlias, NOTICE_PAGE_NUMBER);
+
+				int oldCcsBegin = 0, oldCcsEnd = 0;
+				if (pLayerEff)
+				{
+					oldCcsBegin = pLayerEff->GetBeginFrame();
+					oldCcsEnd   = pLayerEff->GetEndFrame();
+				}
+				else if (pObjEff)
+				{
+					oldCcsBegin = pObjEff->GetBeginFrame();
+					oldCcsEnd   = pObjEff->GetEndFrame();
+				}
+
+				int oldLen = pObject->GetCCSLength();
+				pObject->Replace(strCCSValue, 0);
+				int newLen = pObject->GetCCSLength();
+				int delta  = newLen - oldLen;
+
+				{
+					CString s; s.Format(_T("[CCS_DBG] alias=%s oldLen=%d newLen=%d delta=%d ccs=[%d,%d]"),
+						(LPCTSTR)strCCSAlias, oldLen, newLen, delta, oldCcsBegin, oldCcsEnd);
+					PrintLog(s);
+				}
+
+				if (delta != 0)
+				{
+					int newCcsBegin = oldCcsBegin;
+					int newCcsEnd   = oldCcsEnd + delta;
+
+					CPtrList allEffects;
+					m_pHDdaVinci->GetEffectList(&allEffects, NOTICE_PAGE_NUMBER);
+					for (POSITION epos = allEffects.GetHeadPosition(); epos != NULL;)
+					{
+						CCGXEffect* pEff = (CCGXEffect*)allEffects.GetNext(epos);
+						if (pEff == nullptr || pEff == pLayerEff || pEff == pObjEff)
+							continue;
+						int dbgB0 = pEff->GetBeginFrame();
+						int dbgE0 = pEff->GetEndFrame();
+						CString dbgAlias = pEff->GetAlias();
+						ECCSRelation dbgRel = ClassifyCCSRelation(dbgB0, dbgE0, oldCcsBegin, oldCcsEnd);
+						AdjustEffectByCCSRelation(
+							pEff, oldCcsBegin, oldCcsEnd, newCcsBegin, newCcsEnd);
+						int dbgB1 = pEff->GetBeginFrame();
+						int dbgE1 = pEff->GetEndFrame();
+						{
+							CString s;
+							if (dbgB0 != dbgB1 || dbgE0 != dbgE1)
+								s.Format(_T("[CCS_DBG]   MOVED eff=%s rel=%d before=[%d,%d] after=[%d,%d]"),
+									(LPCTSTR)dbgAlias, (int)dbgRel, dbgB0, dbgE0, dbgB1, dbgE1);
+							else
+								s.Format(_T("[CCS_DBG]   keep  eff=%s rel=%d [%d,%d]"),
+									(LPCTSTR)dbgAlias, (int)dbgRel, dbgB0, dbgE0);
+							PrintLog(s);
+						}
+					}
+
+					if (pLayerEff) pLayerEff->Resize(pLayerEff->GetFrames() + delta);
+					if (pObjEff)   pObjEff->Resize(pObjEff->GetFrames() + delta);
+				}
 			}
 		}
 	}
@@ -7381,7 +7628,7 @@ BOOL CClock2023Dlg::TakeInNotice(INT nIndex)
 
 }
 
-BOOL CClock2023Dlg::TakeOutNotice()
+BOOL CClock2026Dlg::TakeOutNotice()
 {
 	if (!m_pStatus->GetDispState(DISP_AGE_NOTICE) && !m_pStatus->GetDispState(DISP_NOTICE)) return FALSE;
 
@@ -7415,7 +7662,7 @@ BOOL CClock2023Dlg::TakeOutNotice()
 }
 
 
-BOOL CClock2023Dlg::TakeOutAge(void)
+BOOL CClock2026Dlg::TakeOutAge(void)
 {
 	if (!m_pStatus->GetDispState(DISP_AGE) && !m_pStatus->GetDispState(DISP_AGE_NOTICE)) return FALSE;
 
@@ -7457,7 +7704,7 @@ BOOL CClock2023Dlg::TakeOutAge(void)
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispAge()
+void CClock2026Dlg::OnBnClickedCheckDispAge()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_AGE);
 
@@ -7488,7 +7735,7 @@ void CClock2023Dlg::OnBnClickedCheckDispAge()
 
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispNotice()
+void CClock2026Dlg::OnBnClickedCheckDispNotice()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_NOTICE);
 
@@ -7519,7 +7766,7 @@ void CClock2023Dlg::OnBnClickedCheckDispNotice()
 
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispAgeNotice()
+void CClock2026Dlg::OnBnClickedCheckDispAgeNotice()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_AGE_NOTICE);
 
@@ -7552,14 +7799,14 @@ void CClock2023Dlg::OnBnClickedCheckDispAgeNotice()
 
 }
 
-void CClock2023Dlg::OnMouseMove(UINT nFlags, CPoint point)
+void CClock2026Dlg::OnMouseMove(UINT nFlags, CPoint point)
 {
 	WriteStatusBar_MousePos(point);
 
 	CDialogEx::OnMouseMove(nFlags, point);
 }
 
-void CClock2023Dlg::OnBnClickedButtonNoticeMoveUp()
+void CClock2026Dlg::OnBnClickedButtonNoticeMoveUp()
 {
 	CNoticeDataList* pList = m_pStatus->GetNoticeList();
 
@@ -7573,7 +7820,7 @@ void CClock2023Dlg::OnBnClickedButtonNoticeMoveUp()
 	m_SpreadNotice.DrawSelectionForCurIndex();
 }
 
-void CClock2023Dlg::OnBnClickedButtonNoticeMoveDown()
+void CClock2026Dlg::OnBnClickedButtonNoticeMoveDown()
 {
 	CNoticeDataList* pList = m_pStatus->GetNoticeList();
 
@@ -7587,7 +7834,7 @@ void CClock2023Dlg::OnBnClickedButtonNoticeMoveDown()
 	m_SpreadNotice.DrawSelectionForCurIndex();
 }
 
-void CClock2023Dlg::DrawTextWithDoubleBuffering(CWnd* pWnd, CString strText)
+void CClock2026Dlg::DrawTextWithDoubleBuffering(CWnd* pWnd, CString strText)
 {
 	CClientDC dc(pWnd);
 	CDC memDC;
@@ -7618,7 +7865,7 @@ void CClock2023Dlg::DrawTextWithDoubleBuffering(CWnd* pWnd, CString strText)
 
 }
 
-void CClock2023Dlg::SelectChangeManualUpTemplate(void)
+void CClock2026Dlg::SelectChangeManualUpTemplate(void)
 {
 	CString strFpgFileName;
 
@@ -7647,12 +7894,12 @@ void CClock2023Dlg::SelectChangeManualUpTemplate(void)
 
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboManualupTemplates()
+void CClock2026Dlg::OnCbnSelchangeComboManualupTemplates()
 {
 	SelectChangeManualUpTemplate();
 }
 
-void CClock2023Dlg::ReloadManualUpTemplate(void)
+void CClock2026Dlg::ReloadManualUpTemplate(void)
 {
 	m_pComboManualUpTemplate->ResetContent();
 
@@ -7676,12 +7923,12 @@ void CClock2023Dlg::ReloadManualUpTemplate(void)
 	FileFinder.Close();
 }
 
-void CClock2023Dlg::OnBnClickedButtonReloadManualupTemplate()
+void CClock2026Dlg::OnBnClickedButtonReloadManualupTemplate()
 {
 	ReloadManualUpTemplate();
 }
 
-BOOL CClock2023Dlg::PrevManualUp(void)
+BOOL CClock2026Dlg::PrevManualUp(void)
 {
 	CString strFpgFileName;
 
@@ -7719,7 +7966,7 @@ BOOL CClock2023Dlg::PrevManualUp(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::NextManualUp(void)
+BOOL CClock2026Dlg::NextManualUp(void)
 {
 	CString strFpgFileName;
 
@@ -7758,7 +8005,7 @@ BOOL CClock2023Dlg::NextManualUp(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::DispManualUp(void)
+BOOL CClock2026Dlg::DispManualUp(void)
 {
 	m_pHDdaVinci->TakeOut(MANUALUP_PAGE_NUMBER);
 
@@ -7777,7 +8024,7 @@ BOOL CClock2023Dlg::DispManualUp(void)
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::TakeOutManualUp(void)
+BOOL CClock2026Dlg::TakeOutManualUp(void)
 {
 
 	m_pStatus->SetDispStateForPage(DISP_MANUALUP, FALSE, MANUALUP_PAGE_NUMBER);
@@ -7796,7 +8043,7 @@ BOOL CClock2023Dlg::TakeOutManualUp(void)
 	
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispManualUp()
+void CClock2026Dlg::OnBnClickedCheckDispManualUp()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_MANUALUP);
 
@@ -7826,17 +8073,17 @@ void CClock2023Dlg::OnBnClickedCheckDispManualUp()
 }
 
 
-void CClock2023Dlg::OnBnClickedButtonManualupPrev()
+void CClock2026Dlg::OnBnClickedButtonManualupPrev()
 {
 	PrevManualUp();
 }
 
-void CClock2023Dlg::OnBnClickedButtonManualupNext()
+void CClock2026Dlg::OnBnClickedButtonManualupNext()
 {
 	NextManualUp();
 }
 
-void CClock2023Dlg::OnBnClickedCancel()
+void CClock2026Dlg::OnBnClickedCancel()
 {
 	int nResult = AfxMessageBox(_T("MPT 2025 프로그램을 종료하시겠습니까 ? "), MB_YESNO);
 
@@ -7869,7 +8116,7 @@ void CClock2023Dlg::OnBnClickedCancel()
 	CDialogEx::OnCancel();
 }
 
-INT CClock2023Dlg::LoadFromFPG(CString strFileName, int nPage)
+INT CClock2026Dlg::LoadFromFPG(CString strFileName, int nPage)
 {
 	CString strProgress;
 
@@ -7923,7 +8170,7 @@ INT CClock2023Dlg::LoadFromFPG(CString strFileName, int nPage)
 	return nStartIndex;
 }
 
-void CClock2023Dlg::OnBnClickedButtonLoadFpr()
+void CClock2026Dlg::OnBnClickedButtonLoadFpr()
 {
 	CFileDialog dlg(TRUE, _T("fpr"), m_pStatus->m_strFPRFileName);
 	dlg.m_ofn.lpstrDefExt = _T("fpr");
@@ -7954,7 +8201,7 @@ void CClock2023Dlg::OnBnClickedButtonLoadFpr()
 	}
 }
 
-void CClock2023Dlg::GetOrigPosLiveVideoObjects(void)
+void CClock2026Dlg::GetOrigPosLiveVideoObjects(void)
 {
 	SLiveVideoPos& origPos = m_pStatus->LiveVideoConf()->OrigPos();
 
@@ -7973,11 +8220,11 @@ void CClock2023Dlg::GetOrigPosLiveVideoObjects(void)
 	//PrintLog(GETSTR(origPos.m_ptLiveVideo.X) + _T(":") + GETSTR(origPos.m_ptLiveVideo.Y));
 }
 
-void CClock2023Dlg::SetPosLiveVideoObjects(void)
+void CClock2026Dlg::SetPosLiveVideoObjects(void)
 {
 
-	SLiveVideoPos& origPos = m_pStatus->LiveVideoConf()->OrigPos();
-	Point& ptOffset = m_pStatus->LiveVideoConf()->Offset();
+	SLiveVideoPos origPos = m_pStatus->LiveVideoConf()->OrigPos();
+	Point ptOffset = m_pStatus->LiveVideoConf()->Offset();
 
      m_pInputLiveVideoObject->SetPositionByAbs(
 		origPos.m_ptLiveVideo.X + ptOffset.X,
@@ -7988,7 +8235,7 @@ void CClock2023Dlg::SetPosLiveVideoObjects(void)
 		origPos.m_ptMask.Y + ptOffset.Y);
 }
 
-BOOL CClock2023Dlg::DispLiveVideo()
+BOOL CClock2026Dlg::DispLiveVideo()
 {
 	if (m_pStatus->GetDispState(DISP_LIVE_VIDEO))
 	{
@@ -8026,7 +8273,7 @@ BOOL CClock2023Dlg::DispLiveVideo()
 	m_pHDdaVinci->GetScene(LIVE_VIDEO_PAGE_NUMBER)->Prepare(LIVE_VIDEO_PAGE_NUMBER);
 	m_pHDdaVinci->SetScene(LIVE_VIDEO_PAGE_NUMBER, m_pHDdaVinci->GetScene(LIVE_VIDEO_PAGE_NUMBER), 0);
 
-	m_pHDdaVinci->SetPageHandler(this, CClock2023Dlg::HandlerForInputVideo);
+	m_pHDdaVinci->SetPageHandler(this, CClock2026Dlg::HandlerForInputVideo);
 
 	Sleep(100); // 3프레임정도 건너뛰게 만들어야 번쩍임이 없음
 
@@ -8035,7 +8282,7 @@ BOOL CClock2023Dlg::DispLiveVideo()
 	return TRUE;
 }
 
-BOOL CClock2023Dlg::TakeOutLiveVideo(void)
+BOOL CClock2026Dlg::TakeOutLiveVideo(void)
 {
 	m_pStatus->SetDispStateForPage(DISP_LIVE_VIDEO, FALSE, LIVE_VIDEO_PAGE_NUMBER);
 
@@ -8056,7 +8303,7 @@ BOOL CClock2023Dlg::TakeOutLiveVideo(void)
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedCheckDispLiveVideo()
+void CClock2026Dlg::OnBnClickedCheckDispLiveVideo()
 {
 	BOOL bDisp = IsDlgButtonChecked(IDC_CHECK_DISP_LIVE_VIDEO);
 
@@ -8087,14 +8334,14 @@ void CClock2023Dlg::OnBnClickedCheckDispLiveVideo()
 }
 
 
-void CClock2023Dlg::OnBnClickedCheckLiveVideoMoveEnable()
+void CClock2026Dlg::OnBnClickedCheckLiveVideoMoveEnable()
 {
 	m_pStatus->LiveVideoConf()->MoveEnable(IsDlgButtonChecked(IDC_CHECK_LIVE_VIDEO_MOVE_ENABLE));
 
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::LiveVideoResetPos()
+void CClock2026Dlg::LiveVideoResetPos()
 {
 	Point ptOffset(0, 0);
 
@@ -8104,47 +8351,47 @@ void CClock2023Dlg::LiveVideoResetPos()
 }
 
 
-void CClock2023Dlg::LiveVideoMoveUp()
+void CClock2026Dlg::LiveVideoMoveUp()
 {
 	if (m_pStatus->LiveVideoConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->LiveVideoConf()->Offset();
+		Point ptOffset = m_pStatus->LiveVideoConf()->Offset();
 		ptOffset.Y -= m_pStatus->LiveVideoConf()->MovingSize();
 		m_pStatus->LiveVideoConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LiveVideoMoveLeft()
+void CClock2026Dlg::LiveVideoMoveLeft()
 {
 	if (m_pStatus->LiveVideoConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->LiveVideoConf()->Offset();
+		Point ptOffset = m_pStatus->LiveVideoConf()->Offset();
 		ptOffset.X -= m_pStatus->LiveVideoConf()->MovingSize();
 		m_pStatus->LiveVideoConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LiveVideoMoveDown()
+void CClock2026Dlg::LiveVideoMoveDown()
 {
 	if (m_pStatus->LiveVideoConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->LiveVideoConf()->Offset();
+		Point ptOffset = m_pStatus->LiveVideoConf()->Offset();
 		ptOffset.Y += m_pStatus->LiveVideoConf()->MovingSize();
 		m_pStatus->LiveVideoConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LiveVideoMoveRight()
+void CClock2026Dlg::LiveVideoMoveRight()
 {
 	if (m_pStatus->LiveVideoConf()->MoveEnable())
 	{
-		Point& ptOffset = m_pStatus->LiveVideoConf()->Offset();
+		Point ptOffset = m_pStatus->LiveVideoConf()->Offset();
 		ptOffset.X += m_pStatus->LiveVideoConf()->MovingSize();
 		m_pStatus->LiveVideoConf()->Offset(ptOffset);
 	}
 }
 
-void CClock2023Dlg::LiveVideoMove(DIRECTION dir)
+void CClock2026Dlg::LiveVideoMove(DIRECTION dir)
 {
 	if (!m_pStatus->LiveVideoConf()->MoveEnable()) return;
 
@@ -8171,32 +8418,32 @@ void CClock2023Dlg::LiveVideoMove(DIRECTION dir)
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoResetPos()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoResetPos()
 {
 	LiveVideoResetPos();
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoUp()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoUp()
 {
 	LiveVideoMove(DIRECTION::UP);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoLeft()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoLeft()
 {
 	LiveVideoMove(DIRECTION::LEFT);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoDown()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoDown()
 {
 	LiveVideoMove(DIRECTION::DOWN);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoRight()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoRight()
 {
 	LiveVideoMove(DIRECTION::RIGHT);
 }
 
-void CClock2023Dlg::OnEnKillfocusEditLiveVideoMoveSize()
+void CClock2026Dlg::OnEnKillfocusEditLiveVideoMoveSize()
 {
 	CString strBuffer;
 
@@ -8211,7 +8458,7 @@ void CClock2023Dlg::OnEnKillfocusEditLiveVideoMoveSize()
 	SetDlgItemText(IDC_EDIT_LIVE_VIDEO_MOVE_SIZE, GETSTR(m_pStatus->LiveVideoConf()->MovingSize()));
 }
 
-void CClock2023Dlg::LiveVideoSnapSave(INT nSnapNumber)
+void CClock2026Dlg::LiveVideoSnapSave(INT nSnapNumber)
 {
 	CString strTitle = m_pStatus->LiveVideoSnap(nSnapNumber).Title();
 	CInputDlg dlg(strTitle);
@@ -8226,42 +8473,42 @@ void CClock2023Dlg::LiveVideoSnapSave(INT nSnapNumber)
 	}
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave1()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave1()
 {
 	LiveVideoSnapSave(0);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave2()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave2()
 {
 	LiveVideoSnapSave(1);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapSave3()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapSave3()
 {
 	LiveVideoSnapSave(2);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad1()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad1()
 {
 	m_pStatus->LoadLiveVideoSnap(0);
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad2()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad2()
 {
 	m_pStatus->LoadLiveVideoSnap(1);
 
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonLiveVideoSnapLoad3()
+void CClock2026Dlg::OnBnClickedButtonLiveVideoSnapLoad3()
 {
 	m_pStatus->LoadLiveVideoSnap(2);
 
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::SelectChangeLiveVideoTemplate(void)
+void CClock2026Dlg::SelectChangeLiveVideoTemplate(void)
 {
 	CString strFpgFileName;
 
@@ -8276,12 +8523,12 @@ void CClock2023Dlg::SelectChangeLiveVideoTemplate(void)
 
 }
 
-void CClock2023Dlg::OnCbnSelchangeComboLiveVideoTemplates()
+void CClock2026Dlg::OnCbnSelchangeComboLiveVideoTemplates()
 {
 	SelectChangeLiveVideoTemplate();
 }
 
-void CClock2023Dlg::ReloadLiveVideoTemplate(void)
+void CClock2026Dlg::ReloadLiveVideoTemplate(void)
 {
 	m_pComboLiveVideoTemplate->ResetContent();
 
@@ -8305,12 +8552,12 @@ void CClock2023Dlg::ReloadLiveVideoTemplate(void)
 	FileFinder.Close();
 }
 
-void CClock2023Dlg::OnBnClickedButtonReloadLiveVideoTemplate()
+void CClock2026Dlg::OnBnClickedButtonReloadLiveVideoTemplate()
 {
 	ReloadLiveVideoTemplate();
 }
 
-void CClock2023Dlg::OnEnKillfocusEditWeatherDisplayDuration()
+void CClock2026Dlg::OnEnKillfocusEditWeatherDisplayDuration()
 {
 	CString strBuffer;
 	GetDlgItemText(IDC_EDIT_WEATHER_DISPLAY_DURATION, strBuffer);
@@ -8324,12 +8571,12 @@ void CClock2023Dlg::OnEnKillfocusEditWeatherDisplayDuration()
 	UpdateData(FALSE);
 }
 
-void CClock2023Dlg::OnBnClickedButtonDateFormat()
+void CClock2026Dlg::OnBnClickedButtonDateFormat()
 {
 	AfxMessageBox(_T("표기법 -> %M:연도, %M:월, %D:일, %A:요일\n\r 예) 안녕하세요 %M %D입니다. -> 안녕하세요 11월 19일입니다. \n\r 예) %M월 %D일 (%A)요일 -> 11월 19일 (수)요일"));
 }
 
-BOOL CClock2023Dlg::Unlock_Activation()
+BOOL CClock2026Dlg::Unlock_Activation()
 {
 
 	//#ifndef _SD_
@@ -8367,7 +8614,15 @@ BOOL CClock2023Dlg::Unlock_Activation()
 	return TRUE;
 }
 
-void CClock2023Dlg::OnBnClickedButton1()
+void CClock2026Dlg::OnBnClickedButton1()
 {
 	Unlock_Activation();
+}
+
+
+void CClock2026Dlg::OnBnClickedCheckExceptAir()
+{
+	BOOL bExceptAir = IsDlgButtonChecked(IDC_CHECK_EXCEPT_AIR);
+
+	m_pStatus->WeatherConf()->ExceptAir(bExceptAir);
 }

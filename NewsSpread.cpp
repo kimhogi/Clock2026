@@ -86,7 +86,7 @@ void CNewsSpread::SetColumnCellType(int nCol, CFieldInfo& fi)
 
 void CNewsSpread::AllSetUse(CString strData)
 {
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
 
 	vector<CNewsData> vObjects;
 
@@ -114,7 +114,7 @@ void CNewsSpread::OnAllDeselectUse(void)
 
 void CNewsSpread::OnInvertUse(void)
 {
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
 
 	vector<CNewsData> vObjects;
 
@@ -143,11 +143,11 @@ LRESULT CNewsSpread::EditModeOff(WPARAM wParam, LPARAM lParam)
 
 	if (!bDataChage) return 0;
 
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
 
 	if (pList == nullptr) return 0;
 
-	CNewsData Object = pList->GetAt(nRow - 1);
+	auto& Object = pList->GetAt(nRow - 1);
 	CString strData = GetStringData(nCol, nRow);
 
 	Object.SetValue(GetFields()[nCol - 1].GetFieldName(), strData);
@@ -161,7 +161,7 @@ BOOL CNewsSpread::UpdateRow(int nSheetIndex, SS_COORD nRow, BOOL bSaveAndValidat
 {
 	nSheetIndex = _LIMIT_RANGE_(nSheetIndex, 1, GetSheetCount());
 
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, nSheetIndex - 1);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, nSheetIndex - 1);
 
 	if (pList == nullptr) return FALSE;
 
@@ -173,7 +173,7 @@ BOOL CNewsSpread::UpdateRow(int nSheetIndex, SS_COORD nRow, BOOL bSaveAndValidat
 
 	int nFieldsCount = fields.GetFieldsCount();
 
-	CNewsData Object = pList->GetAt(nDataIndex);
+	auto& Object = pList->GetAt(nDataIndex);
 
 	if (bSaveAndValidate)
 	{
@@ -217,9 +217,9 @@ BOOL CNewsSpread::UpdateDataSheet(int nSheetIndex, BOOL bSaveAndValidate, BOOL b
 
 	nSheetIndex = _LIMIT_RANGE_(nSheetIndex, 1, GetSheetCount());
 
-	SetSheet(nSheetIndex);
+	SetSheet(static_cast<short>(nSheetIndex));
 
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, nSheetIndex - 1);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, nSheetIndex - 1);
 
 	if (pList == nullptr) return FALSE;   // 해당사항 없으므로 리턴
 
@@ -291,7 +291,7 @@ LRESULT CNewsSpread::LButtonClicked(CNewsData& Object, WPARAM wParam, LPARAM lPa
 	SS_CELLTYPE cellType;
 	LRESULT lResult = 0;
 
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
 
 	if (pList == nullptr) return 0;
 
@@ -336,11 +336,11 @@ LRESULT CNewsSpread::CheckBoxChange(WPARAM wParam, LPARAM lParam)
 
 	if (nRow < 1) return 0;
 
-	CNewsDataList* pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
+	auto pList = GetPtrDataByIndex<CNewsDataList>(m_pPtrList, 0);
 
 	if (pList == nullptr) return 0;
 
-	CNewsData& Object = pList->GetAt(nRow - 1);
+	auto Object = pList->GetAt(nRow - 1);
 
 	if (!Object.IsValid())
 	{

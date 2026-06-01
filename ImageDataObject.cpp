@@ -99,7 +99,7 @@ void CImageDataObject::InsertBitmap(IRichEditOle* pRichEditOle, HBITMAP hBitmap,
 	reobject.poleobj = pOleObject;
 	reobject.polesite = pOleClientSite;
 	reobject.pstg = pStorage;
-	STG_PATH sp( pStorage, strPath);	
+	STG_PATH sp(pStorage, strPath);	
 
 	SPVEC::iterator it;
 	for(it = m_vecStoragePath.begin(); it != m_vecStoragePath.end(); ++it)

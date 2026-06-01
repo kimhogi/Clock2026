@@ -1,5 +1,5 @@
 
-// Clock2023Dlg.h : header file
+// Clock2026Dlg.h : header file
 //
 
 #pragma once
@@ -44,17 +44,26 @@ constexpr auto ID_TIMER_DISPLAY_NOTICE = 120;
 constexpr auto ID_TIMER_DISPLAY_AGE = 230;
 
 
-// CClock2023Dlg dialog
-class CClock2023Dlg : public CDialogEx
+// CClock2026Dlg dialog
+class CClock2026Dlg : public CDialogEx
 {
 // Construction
 public:
-	CClock2023Dlg(CWnd* pParent = nullptr);	// standard constructor
+	CClock2026Dlg(CWnd* pParent = nullptr);	// standard constructor
+
+
 
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
-	enum { IDD = IDD_CLOCK2023_DIALOG };
+	enum { IDD = IDD_CLOCK2026_DIALOG };
 #endif
+
+private:
+	std::unique_ptr<std::mutex> m_pMutexSNTP;
+	std::unique_ptr<std::mutex> m_pMutexReadWeather;
+	std::unique_ptr<std::mutex> m_pMutexHandler;
+
+public:
 	CStatus* m_pStatus;
 	CHDdaVinci* m_pHDdaVinci;
 	            
@@ -128,10 +137,6 @@ public:
 
 	CCGXLayer* m_pInputLiveVideoLayer;
 
-	//CCGXObject* m_pClockObjects[FROM_E(CLOCK_OBJECTS::LAST_NUM)];
-
-	//CCGXObject* m_pBigClockObjects[FROM_E(BIG_CLOCK_OBJECTS::LAST_NUM)];
-
 	CCGXLayer* m_pWeatherLayer[FROM_E(WEATHER_LAYERS::LAST_NUM)];
 	CCGXObject* m_pWeatherObject[FROM_E(WEATHER_OBJECTS::LAST_NUM)];
 
@@ -173,8 +178,6 @@ public:
 	std::mutex m_mutexSNTP;
 	std::mutex m_mutexReadWeather;
 	std::mutex m_mutexHandler;
-	std::mutex m_mutexLog;
-	std::mutex m_mutexButton;
 
 	CPreviewStatic m_PreviewNotice;
 
@@ -200,11 +203,11 @@ public:
 
 	CComboBox* m_pComboLiveVideoTemplate;
 
-	DWORD m_dwPrevTickDisplayClock;
-	DWORD m_dwPrevTickDisplayBigClock;
-	DWORD m_dwPrevTickDisplayNotice;
-	DWORD m_dwPrevTickDisplayNews;
-	DWORD m_dwPrevTickDisplayWeather;
+	ULONGLONG m_dwPrevTickDisplayClock;
+	ULONGLONG m_dwPrevTickDisplayBigClock;
+	ULONGLONG m_dwPrevTickDisplayNotice;
+	ULONGLONG m_dwPrevTickDisplayNews;
+	ULONGLONG m_dwPrevTickDisplayWeather;
 
 
 	ALIAS_COORD m_NewsContentsCoord;
@@ -214,6 +217,13 @@ public:
 	CCGXObject* m_pSystemImageObject;
 
 public:
+
+	void InitializeMutexes() {
+		new (&m_mutexSNTP) std::mutex();
+		new (&m_mutexReadWeather) std::mutex();
+		new (&m_mutexHandler) std::mutex();
+	}
+
 	BOOL InitCtrls(void);
 
 	BOOL InitEdits(void);
@@ -252,7 +262,6 @@ public:
 	BOOL IsEditFocus(void);
 	
 	BOOL InitStatusBar(void);
-
 
 	void SetStautsBar_PaneColor(INT nID, COLORREF clrText, COLORREF clrBack);
 	void WriteStatusBar_FileName(CString strFileName);
@@ -316,7 +325,7 @@ public:
 	BOOL Load(CString& strFileName);
 	BOOL LoadFile(CString& strFileName);
 
-	BOOL Save(CString& strFileName);
+	BOOL Save(CString strFileName);
 	BOOL SaveFile(CString& strFileName);
 	BOOL SaveAsFile(CString& strFileName);
 
@@ -735,4 +744,5 @@ public:
 	afx_msg void OnBnClickedButtonDateFormat();
 	BOOL Unlock_Activation();
 	afx_msg void OnBnClickedButton1();
+	afx_msg void OnBnClickedCheckExceptAir();
 };

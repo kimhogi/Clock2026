@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# --- Session/tooling artifacts (not for public repo) ---
+*.bak
+*.bak.*
+_fix_replaceloop.ps1
+.bkit/
+.claude/
