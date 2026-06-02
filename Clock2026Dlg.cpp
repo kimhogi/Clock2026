@@ -7487,7 +7487,11 @@ BOOL CClock2026Dlg::TakeInNotice(INT nIndex)
 		return FALSE;
 	}
 
+	LARGE_INTEGER ccsQpcFreq = {}, ccsTOpen0 = {}, ccsTOpen1 = {}, ccsTTake0 = {}, ccsTTake1 = {};
+	QueryPerformanceFrequency(&ccsQpcFreq);
+	QueryPerformanceCounter(&ccsTOpen0);
 	m_pHDdaVinci->Open(strTemplateFileName, 1, NOTICE_PAGE_NUMBER);
+	QueryPerformanceCounter(&ccsTOpen1);
 
 	CCGXObject* pObject = m_pHDdaVinci->GetCGXObject(_T("¿¬·É"), NOTICE_PAGE_NUMBER);
 
@@ -7567,12 +7571,6 @@ BOOL CClock2026Dlg::TakeInNotice(INT nIndex)
 				int newLen = pObject->GetCCSLength();
 				int delta  = newLen - oldLen;
 
-				{
-					CString s; s.Format(_T("[CCS_DBG] alias=%s oldLen=%d newLen=%d delta=%d ccs=[%d,%d]"),
-						(LPCTSTR)strCCSAlias, oldLen, newLen, delta, oldCcsBegin, oldCcsEnd);
-					PrintLog(s);
-				}
-
 				if (delta != 0)
 				{
 					int newCcsBegin = oldCcsBegin;
@@ -7585,24 +7583,8 @@ BOOL CClock2026Dlg::TakeInNotice(INT nIndex)
 						CCGXEffect* pEff = (CCGXEffect*)allEffects.GetNext(epos);
 						if (pEff == nullptr || pEff == pLayerEff || pEff == pObjEff)
 							continue;
-						int dbgB0 = pEff->GetBeginFrame();
-						int dbgE0 = pEff->GetEndFrame();
-						CString dbgAlias = pEff->GetAlias();
-						ECCSRelation dbgRel = ClassifyCCSRelation(dbgB0, dbgE0, oldCcsBegin, oldCcsEnd);
 						AdjustEffectByCCSRelation(
 							pEff, oldCcsBegin, oldCcsEnd, newCcsBegin, newCcsEnd);
-						int dbgB1 = pEff->GetBeginFrame();
-						int dbgE1 = pEff->GetEndFrame();
-						{
-							CString s;
-							if (dbgB0 != dbgB1 || dbgE0 != dbgE1)
-								s.Format(_T("[CCS_DBG]   MOVED eff=%s rel=%d before=[%d,%d] after=[%d,%d]"),
-									(LPCTSTR)dbgAlias, (int)dbgRel, dbgB0, dbgE0, dbgB1, dbgE1);
-							else
-								s.Format(_T("[CCS_DBG]   keep  eff=%s rel=%d [%d,%d]"),
-									(LPCTSTR)dbgAlias, (int)dbgRel, dbgB0, dbgE0);
-							PrintLog(s);
-						}
 					}
 
 					if (pLayerEff) pLayerEff->Resize(pLayerEff->GetFrames() + delta);
@@ -7622,7 +7604,20 @@ BOOL CClock2026Dlg::TakeInNotice(INT nIndex)
 	std::lock_guard<std::mutex> lock(m_mutexHandler);
 #endif
 
+	QueryPerformanceCounter(&ccsTTake0);
 	m_pHDdaVinci->TakeInEx(NOTICE_PAGE_NUMBER);
+	QueryPerformanceCounter(&ccsTTake1);
+
+	{
+		double ccsMsOpen   = (double)(ccsTOpen1.QuadPart - ccsTOpen0.QuadPart) * 1000.0 / (double)ccsQpcFreq.QuadPart;
+		double ccsMsPrep   = (double)(ccsTTake0.QuadPart - ccsTOpen1.QuadPart) * 1000.0 / (double)ccsQpcFreq.QuadPart;
+		double ccsMsTakein = (double)(ccsTTake1.QuadPart - ccsTTake0.QuadPart) * 1000.0 / (double)ccsQpcFreq.QuadPart;
+		double ccsMsWindow = (double)(ccsTTake1.QuadPart - ccsTOpen0.QuadPart) * 1000.0 / (double)ccsQpcFreq.QuadPart;
+		CString s;
+		s.Format(_T("[CCS_T] open=%.2f prep=%.2f takein=%.2f window(open..onair)=%.2f ms  OVER30=%s"),
+			ccsMsOpen, ccsMsPrep, ccsMsTakein, ccsMsWindow, (ccsMsWindow > 30.0 ? _T("YES") : _T("no")));
+		PrintLog(s);
+	}
 
 	return TRUE;
 
