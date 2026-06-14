@@ -1,15 +1,15 @@
 ---
-name: mfc-pdca
+name: khg-mfc
 description: >-
   MFC / Visual Studio C++ 프로젝트를 PDCA + TDD 규율로 안전하게 개발할 때 사용한다.
-  특정 저장소 전용이 아니라 모든 MFC 프로젝트에 두루 쓴다. 큰 작업은 공용 loop 스킬의
+  특정 저장소 전용이 아니라 모든 MFC 프로젝트에 두루 쓴다. 큰 작업은 공용 khg-loop 스킬의
   풀 라이프사이클(PRD→TRD→계획→구현→검증→테스트→회고)을 멀티에이전트로 돌리고,
   검증/테스트 단계를 MSBuild 빌드 + CppUnitTest로 채운다. 작은 변경은 안쪽 6단계
   마이크로 루프만 쓴다. 산출물은 docs/loops/<task-id>/ 에 파일로 남긴다.
   Use for disciplined, test-driven, multi-agent changes to any MFC/Visual Studio C++ codebase.
 ---
 
-# mfc-pdca — MFC 프로젝트용 PDCA 개발 스킬 (풀 라이프사이클 + 멀티에이전트)
+# khg-mfc — MFC 프로젝트용 PDCA 개발 스킬 (풀 라이프사이클 + 멀티에이전트)
 
 MFC(또는 Visual Studio C++) 프로젝트의 변경을 **추측 없이, 한 걸음씩, 매번 검증하며**
 진행하기 위한 스킬이다. 어떤 MFC 저장소에서도 동작하도록 프로젝트 구성은 자동 인식한다.
@@ -18,11 +18,11 @@ MFC(또는 Visual Studio C++) 프로젝트의 변경을 **추측 없이, 한 걸
 
 이 스킬은 단계를 다시 정의하지 않고 두 문서를 **참조**한다:
 
-1. **공용 풀 라이프사이클 루프**: `@.claude/skills/loop/SKILL.md`
+1. **공용 풀 라이프사이클 루프**: `@.claude/skills/khg-loop/SKILL.md`
    - 바깥 루프: PRD → TRD → 계획 → 구현 → 검증 → 테스트 → 회고 (각 단계 전담 **서브에이전트**, 산출물 파일 인수인계).
    - 안쪽 루프: FRAME → OBSERVE → PLAN → ACT → CHECK → REFLECT (구현 단계 엔진, 작은 작업은 단독 사용).
    - 게이트·가드레일·산출물 작업공간(`docs/loops/<task-id>/`)·템플릿 정의.
-2. **MFC 전용 절차**: `@.claude/skills/mfc-pdca/loop.md`
+2. **MFC 전용 절차**: `@.claude/skills/khg-mfc/loop.md`
    - 위 루프의 **VERIFY(검증)=MSBuild 빌드+리뷰**, **TEST(테스트)=CppUnitTest(vstest)** 로 빈 칸을 채움.
    - 프로젝트 자동 인식, TDD 규율, MFC 주의점, DONE 기준.
 

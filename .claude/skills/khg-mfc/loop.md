@@ -1,6 +1,6 @@
 # MFC PDCA Loop — MFC / Visual Studio C++ 공용 실행 루프
 
-> 이 파일은 범용 루프 **@.claude/skills/loop/SKILL.md** 를 **모든 MFC(또는 VS C++)
+> 이 파일은 범용 루프 **@.claude/skills/khg-loop/SKILL.md** 를 **모든 MFC(또는 VS C++)
 > 프로젝트**에 맞게 구체화한 것이다. 특정 저장소에 묶이지 않는다 —
 > 솔루션 이름·구성·테스트 프로젝트는 **작업 시작 시 자동 인식(auto-detect)** 한다.
 >
@@ -173,4 +173,4 @@ vstest.console.exe <TEST_DLL> /Tests:<TestClassOrMethod>
 
 이 루프의 게이트·TDD 규율은 GitHub의 PDCA 스킬을 참고했다.
 - kenjudy/pdca-framework — <https://github.com/kenjudy/pdca-framework>
-- (범용 단계 정의는 `@.claude/skills/loop/SKILL.md` 참고)
+- (범용 단계 정의는 `@.claude/skills/khg-loop/SKILL.md` 참고)

@@ -1,17 +1,17 @@
 ---
-name: loop
+name: khg-loop
 description: >-
   여러 스킬에서 두루 재사용하는 풀 라이프사이클 멀티에이전트 실행 루프.
   PRD → TRD → 계획 → 구현 → 검증 → 테스트 → 회고를 순환 구조로 굴리며, 각 단계를
   전담 서브에이전트가 맡고 단계 간 인수인계는 디스크의 산출물 파일로 한다.
-  큰 기능/프로젝트를 끝까지 체계적으로 완성할 때, 또는 다른 스킬(mfc-pdca 등)이
+  큰 기능/프로젝트를 끝까지 체계적으로 완성할 때, 또는 다른 스킬(khg-mfc 등)이
   공용 루프를 참조해 도메인별 검증만 끼워 넣을 때 사용한다. 작은 변경은 안쪽
   6단계 마이크로 루프만 단독으로 써도 된다. Use as a reusable, multi-agent
   PRD→TRD→Plan→Implement→Verify→Test lifecycle with file-based hand-off, or as a
   base loop other skills reference.
 ---
 
-# loop — 공용 풀 라이프사이클 실행 루프 (multi-agent)
+# khg-loop — 공용 풀 라이프사이클 실행 루프 (multi-agent)
 
 > 이 문서는 **특정 도메인에 묶이지 않은 범용 루프**다. MFC, 문서 작성, 리팩터링 등
 > 어떤 스킬이든 이 루프를 뼈대로 삼아 자기 도메인의 "검증 방법"만 끼워 넣으면 된다.
@@ -23,7 +23,7 @@ description: >-
 >
 > 다른 스킬에서 참조하는 방법:
 > ```
-> 이 작업은 @.claude/skills/loop/SKILL.md 의 루프를 따른다.
+> 이 작업은 @.claude/skills/khg-loop/SKILL.md 의 루프를 따른다.
 > 검증(VERIFY)/테스트(TEST) 단계의 명령 = <도메인 검증 절차>를 사용한다.
 > ```
 
@@ -65,7 +65,7 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 └── retro.md                 # 7. 회고(잘된 점/문제/다음 사이클 액션, 루프 개선)
 ```
 
-각 산출물의 양식은 **`.claude/skills/loop/templates/`** 의 동명 템플릿을 복사해 채운다.
+각 산출물의 양식은 **`.claude/skills/khg-loop/templates/`** 의 동명 템플릿을 복사해 채운다.
 다른 작업공간 경로를 쓰고 싶으면 `_state.md`에 명시하고 그 경로로 통일한다.
 
 ---
@@ -79,7 +79,7 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 1. 직전 단계 산출물 경로를 확인한다 (`docs/loops/<id>/...`).
 2. Agent 도구로 그 단계 담당 서브에이전트를 띄운다 (`subagent_type` 지정). 프롬프트에 반드시 포함:
    - **역할**(이 단계가 무엇인지) + **읽을 입력 산출물 경로** + **써야 할 출력 산출물 경로**
-   - **사용할 템플릿 경로**(`.claude/skills/loop/templates/<단계>.md`)
+   - **사용할 템플릿 경로**(`.claude/skills/khg-loop/templates/<단계>.md`)
    - **완료 기준(DoD)** 과 "끝나면 파일을 저장하고 3줄 요약만 반환하라"
 3. 서브에이전트는 입력을 읽고 → 작업하고 → **출력 산출물 파일을 저장**하고 → 요약을 반환한다.
 4. 오케스트레이터는 `_state.md`를 갱신하고 **게이트**(사람 승인 또는 자동 검증)를 통과시킨다.
@@ -196,14 +196,14 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 | `테스트 작성 관례`     | 테스트 프레임워크·assert 관례                          |
 | `작업공간 경로`        | 기본 `docs/loops/<id>/` 외 다른 경로를 쓸 경우         |
 
-예시(MFC PDCA 스킬): `@.claude/skills/mfc-pdca/loop.md` 가 VERIFY=MSBuild 빌드,
+예시(MFC PDCA 스킬): `@.claude/skills/khg-mfc/loop.md` 가 VERIFY=MSBuild 빌드,
 TEST=CppUnitTest(vstest) 실행으로 위 구멍을 채운다.
 
 ---
 
 ## 7. 산출물 템플릿
 
-`.claude/skills/loop/templates/` 에 각 단계 템플릿이 있다. 새 작업 시 작업공간으로 복사해 채운다.
+`.claude/skills/khg-loop/templates/` 에 각 단계 템플릿이 있다. 새 작업 시 작업공간으로 복사해 채운다.
 
 - `_state.md`, `PRD.md`, `TRD.md`, `plan.md`, `progress.md`, `verification.md`, `test-report.md`, `retro.md`
 
