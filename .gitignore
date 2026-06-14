@@ -366,4 +366,15 @@ FodyWeavers.xsd
 *.bak.*
 _fix_replaceloop.ps1
 .bkit/
-.claude/
+.claude/*
+# 공유 스킬/훅/설정/인코딩 매니페스트는 저장소에 포함
+# (로컬 설정 settings.local.json, 임시 상태 .enc-state 는 계속 무시)
+!.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
+!.claude/mfc-encodings.json
+.claude/settings.local.json
+.claude/.enc-state/
+
+# build/delivery artifacts
+dist/
