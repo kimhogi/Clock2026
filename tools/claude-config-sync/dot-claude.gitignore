@@ -1,0 +1,38 @@
+# === ~/.claude/.gitignore — 여러 PC 동기화용 ===
+# 이 파일을 ~/.claude/.gitignore 로 복사하세요.
+# 핵심: "공유할 설정"만 추적하고, "비밀/기기별/휘발성" 파일은 무시 → 충돌 최소화.
+
+# --- 비밀/인증 (절대 동기화 금지) ---
+.credentials.json
+*credentials*.json
+*.key
+*.pem
+.env
+.env.*
+
+# --- 기기별 로컬 설정 ---
+settings.local.json
+
+# --- 휘발성 상태(자주 바뀜 → 충돌·노이즈 유발) ---
+projects/
+todos/
+history/
+history.jsonl
+shell-snapshots/
+statsig/
+logs/
+ide/
+.enc-state/
+uploads/
+__pycache__/
+*.pyc
+
+# --- 동기화 산출물/백업 ---
+sync.log
+SYNC_CONFLICT.txt
+*.bak
+*.bak.*
+
+# === 위에 해당하지 않는 것은 추적됨 ===
+# 동기화 대상(예): skills/  agents/  commands/  settings.json  CLAUDE.md  plugins(설정)
+# 필요 없으면 아래로 명시적으로 무시할 수도 있습니다.
