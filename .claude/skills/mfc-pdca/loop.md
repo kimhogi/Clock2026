@@ -7,13 +7,19 @@
 > 범용 루프의 6단계(FRAME→OBSERVE→PLAN→ACT→CHECK→REFLECT→DONE)는 그대로 따르고,
 > 비어 있던 **CHECK(검증) 명령**과 **OBSERVE 대상**을 MFC/MSBuild 절차로 채운다.
 >
-> PDCA ↔ 범용 루프 대응:
-> | PDCA  | 범용 루프 단계         | MFC 프로젝트에서 의미                        |
-> | ----- | ---------------------- | ------------------------------------------- |
-> | Plan  | FRAME + OBSERVE + PLAN | 목표 고정, 관련 코드 읽기, 실패 테스트 설계  |
-> | Do    | ACT                    | 최소 구현 (TDD: red→green)                  |
-> | Check | CHECK                  | **빌드 + 단위 테스트 실행** (아래 절차)      |
-> | Act   | REFLECT                | 리팩터·회고·다음 사이클 반영                 |
+> 두 가지 사용 방식이 있다:
+> - **풀 라이프사이클**: 범용 루프의 바깥 단계(PRD→TRD→PLAN→IMPLEMENT→VERIFY→TEST→RETRO)를
+>   멀티에이전트로 돌리고, 그중 **VERIFY/TEST 단계의 명령**을 아래 MFC 절차로 채운다.
+>   산출물은 `docs/loops/<task-id>/`에 저장(범용 루프 1장 참조).
+> - **경량(안쪽 마이크로 루프만)**: 작은 변경은 FRAME→OBSERVE→PLAN→ACT→CHECK→REFLECT만 사용.
+>
+> PDCA ↔ 루프 단계 대응:
+> | PDCA  | 범용 루프 단계                              | MFC 프로젝트에서 의미                        |
+> | ----- | ------------------------------------------- | ------------------------------------------- |
+> | Plan  | PRD + TRD + PLAN (바깥) / FRAME+OBSERVE+PLAN(안쪽) | 무엇/왜·설계·태스크 분해, 실패 테스트 설계 |
+> | Do    | IMPLEMENT / ACT                             | 최소 구현 (TDD: red→green)                  |
+> | Check | VERIFY + TEST / CHECK                       | **빌드 + 단위 테스트 실행** (아래 절차)      |
+> | Act   | RETRO / REFLECT                             | 리팩터·회고·다음 사이클 반영                 |
 
 ---
 
@@ -47,6 +53,11 @@
 ---
 
 ## 1. CHECK 절차 (이 루프의 심장 — 반드시 실행/안내)
+
+> 라이프사이클 매핑: **VERIFY 단계 = 1-1 빌드 + 코드 리뷰**, **TEST 단계 = 1-2 단위 테스트**.
+> 멀티에이전트로 돌 때 VERIFY/TEST는 각각 `general-purpose` 서브에이전트가 맡고, 결과를
+> `docs/loops/<task-id>/verification.md`, `test-report.md`에 기록한다(범용 루프 2·3장 참조).
+> 안쪽 마이크로 루프에서는 이 절차가 그대로 CHECK 단계가 된다.
 
 아래 명령의 `<...>`는 0단계에서 인식한 값으로 치환한다.
 
