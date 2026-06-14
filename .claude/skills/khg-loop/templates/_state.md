@@ -4,7 +4,7 @@
 - **현재 단계**: PRD | TRD | PLAN | IMPLEMENT | VERIFY | TEST | RETRO | DONE
 - **사이클 번호**: 1
 - **작업공간**: docs/loops/<task-id>/
-- **담당 스킬**: (예: khg-mfc) / 검증 명령 출처: @.claude/skills/<...>/loop.md
+- **담당 스킬**: (예: khg-mfc) / 검증 명령 출처: 해당 도메인 스킬(khg-mfc 등)의 loop.md
 
 ## 게이트 상태
 - [ ] PRD 승인 (사람)

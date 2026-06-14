@@ -23,7 +23,7 @@ description: >-
 >
 > 다른 스킬에서 참조하는 방법:
 > ```
-> 이 작업은 @.claude/skills/khg-loop/SKILL.md 의 루프를 따른다.
+> 이 작업은 khg-loop 스킬의 루프를 따른다.
 > 검증(VERIFY)/테스트(TEST) 단계의 명령 = <도메인 검증 절차>를 사용한다.
 > ```
 
@@ -65,7 +65,7 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 └── retro.md                 # 7. 회고(잘된 점/문제/다음 사이클 액션, 루프 개선)
 ```
 
-각 산출물의 양식은 **`.claude/skills/khg-loop/templates/`** 의 동명 템플릿을 복사해 채운다.
+각 산출물의 양식은 **`${CLAUDE_SKILL_DIR}/templates/`** 의 동명 템플릿을 복사해 채운다.
 다른 작업공간 경로를 쓰고 싶으면 `_state.md`에 명시하고 그 경로로 통일한다.
 
 ---
@@ -79,7 +79,7 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 1. 직전 단계 산출물 경로를 확인한다 (`docs/loops/<id>/...`).
 2. Agent 도구로 그 단계 담당 서브에이전트를 띄운다 (`subagent_type` 지정). 프롬프트에 반드시 포함:
    - **역할**(이 단계가 무엇인지) + **읽을 입력 산출물 경로** + **써야 할 출력 산출물 경로**
-   - **사용할 템플릿 경로**(`.claude/skills/khg-loop/templates/<단계>.md`)
+   - **사용할 템플릿 경로**(`${CLAUDE_SKILL_DIR}/templates/<단계>.md`)
    - **완료 기준(DoD)** 과 "끝나면 파일을 저장하고 3줄 요약만 반환하라"
 3. 서브에이전트는 입력을 읽고 → 작업하고 → **출력 산출물 파일을 저장**하고 → 요약을 반환한다.
 4. 오케스트레이터는 `_state.md`를 갱신하고 **게이트**(사람 승인 또는 자동 검증)를 통과시킨다.
@@ -181,7 +181,7 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
   덮어쓰기 전엔 내용을 먼저 확인하고, 설명과 모순되면 진행 대신 알린다.
 - **정직한 보고**: 실패는 출력과 함께, 건너뜀은 이유와 함께. `_state.md`에 항상 실제 상태를 반영.
 - **인코딩 보존**: 비-UTF8/BOM 파일(예: CP949·UTF-16)은 도메인 하네스를 통해서만 편집한다.
-  직접 편집은 한글 등 멀티바이트 텍스트를 손상시킬 수 있다. (MFC: `.claude/hooks/mfc_encoding.py begin/end`)
+  직접 편집은 한글 등 멀티바이트 텍스트를 손상시킬 수 있다. (MFC: khg-mfc 스킬의 scripts/mfc_encoding.py begin/end)
 
 ---
 
@@ -196,14 +196,14 @@ docs/loops/<task-id>/        # task-id = YYYYMMDD-<짧은-슬러그>
 | `테스트 작성 관례`     | 테스트 프레임워크·assert 관례                          |
 | `작업공간 경로`        | 기본 `docs/loops/<id>/` 외 다른 경로를 쓸 경우         |
 
-예시(MFC PDCA 스킬): `@.claude/skills/khg-mfc/loop.md` 가 VERIFY=MSBuild 빌드,
+예시(khg-mfc 스킬): 그 스킬의 loop.md 가 VERIFY=MSBuild 빌드,
 TEST=CppUnitTest(vstest) 실행으로 위 구멍을 채운다.
 
 ---
 
 ## 7. 산출물 템플릿
 
-`.claude/skills/khg-loop/templates/` 에 각 단계 템플릿이 있다. 새 작업 시 작업공간으로 복사해 채운다.
+`${CLAUDE_SKILL_DIR}/templates/` 에 각 단계 템플릿이 있다. 새 작업 시 작업공간으로 복사해 채운다.
 
 - `_state.md`, `PRD.md`, `TRD.md`, `plan.md`, `progress.md`, `verification.md`, `test-report.md`, `retro.md`
 

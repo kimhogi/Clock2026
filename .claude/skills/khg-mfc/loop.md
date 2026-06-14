@@ -1,6 +1,6 @@
 # MFC PDCA Loop — MFC / Visual Studio C++ 공용 실행 루프
 
-> 이 파일은 범용 루프 **@.claude/skills/khg-loop/SKILL.md** 를 **모든 MFC(또는 VS C++)
+> 이 파일은 범용 루프(**khg-loop 스킬**) 를 **모든 MFC(또는 VS C++)
 > 프로젝트**에 맞게 구체화한 것이다. 특정 저장소에 묶이지 않는다 —
 > 솔루션 이름·구성·테스트 프로젝트는 **작업 시작 시 자동 인식(auto-detect)** 한다.
 >
@@ -60,15 +60,15 @@ MFC 한글 프로젝트는 파일마다 인코딩이 섞여 있다(**CP949(BOM �
 
 이 저장소에는 이를 막는 **하네스**가 있다:
 - 파일별 원본 인코딩 기록: `.claude/mfc-encodings.json`
-  (재생성: `python3 .claude/hooks/mfc_encoding.py manifest`)
+  (재생성: `python3 ${CLAUDE_SKILL_DIR}/scripts/mfc_encoding.py manifest`)
 - **PreToolUse 훅**: CP949/UTF-16 파일의 직접 Edit/Write를 **자동 차단**한다.
 - **PostToolUse 훅**: 원래 UTF-8+BOM 이던 파일의 BOM을 **자동 복원**한다.
 - 설정: `.claude/settings.json`
 
 ### 비-UTF8 파일(한글 .cpp/.h/.rc 등)을 편집하는 올바른 절차
-1. `python3 .claude/hooks/mfc_encoding.py begin <파일>` → 파일을 UTF-8로 임시 변환(한글 정상 표시)
+1. `python3 ${CLAUDE_SKILL_DIR}/scripts/mfc_encoding.py begin <파일>` → 파일을 UTF-8로 임시 변환(한글 정상 표시)
 2. 평소대로 Read/Edit 로 수정
-3. `python3 .claude/hooks/mfc_encoding.py end <파일>` → 원래 인코딩(CP949 등 + BOM)으로 **무손상 복원**
+3. `python3 ${CLAUDE_SKILL_DIR}/scripts/mfc_encoding.py end <파일>` → 원래 인코딩(CP949 등 + BOM)으로 **무손상 복원**
 
 > Windows: `.\.claude\hooks\mfc-edit.ps1 begin|end <파일>` / Linux·macOS: `.claude/hooks/mfc-edit.sh begin|end <파일>`
 
@@ -173,4 +173,4 @@ vstest.console.exe <TEST_DLL> /Tests:<TestClassOrMethod>
 
 이 루프의 게이트·TDD 규율은 GitHub의 PDCA 스킬을 참고했다.
 - kenjudy/pdca-framework — <https://github.com/kenjudy/pdca-framework>
-- (범용 단계 정의는 `@.claude/skills/khg-loop/SKILL.md` 참고)
+- (범용 단계 정의는 khg-loop 스킬 참고)

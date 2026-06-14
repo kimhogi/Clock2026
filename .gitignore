@@ -375,3 +375,6 @@ _fix_replaceloop.ps1
 !.claude/mfc-encodings.json
 .claude/settings.local.json
 .claude/.enc-state/
+
+# build/delivery artifacts
+dist/
