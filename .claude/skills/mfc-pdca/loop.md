@@ -52,6 +52,33 @@
 
 ---
 
+## 0.5 인코딩 보존 (필수 — 한글 손상 방지)
+
+MFC 한글 프로젝트는 파일마다 인코딩이 섞여 있다(**CP949(BOM 없음) / UTF-8+BOM / UTF-16 / ASCII**).
+편집 도구(Read/Edit/Write)는 파일을 UTF-8로 다루므로, **CP949·UTF-16 파일을 직접 편집하면
+읽는 순간 한글이 깨지고 저장 시 원본이 영구 손상된다**(실측 확인됨).
+
+이 저장소에는 이를 막는 **하네스**가 있다:
+- 파일별 원본 인코딩 기록: `.claude/mfc-encodings.json`
+  (재생성: `python3 .claude/hooks/mfc_encoding.py manifest`)
+- **PreToolUse 훅**: CP949/UTF-16 파일의 직접 Edit/Write를 **자동 차단**한다.
+- **PostToolUse 훅**: 원래 UTF-8+BOM 이던 파일의 BOM을 **자동 복원**한다.
+- 설정: `.claude/settings.json`
+
+### 비-UTF8 파일(한글 .cpp/.h/.rc 등)을 편집하는 올바른 절차
+1. `python3 .claude/hooks/mfc_encoding.py begin <파일>` → 파일을 UTF-8로 임시 변환(한글 정상 표시)
+2. 평소대로 Read/Edit 로 수정
+3. `python3 .claude/hooks/mfc_encoding.py end <파일>` → 원래 인코딩(CP949 등 + BOM)으로 **무손상 복원**
+
+> Windows: `.\.claude\hooks\mfc-edit.ps1 begin|end <파일>` / Linux·macOS: `.claude/hooks/mfc-edit.sh begin|end <파일>`
+
+### OBSERVE 단계 규칙
+- 파일을 고치기 전 `... detect <파일>` 로 인코딩을 확인한다(또는 훅의 차단 메시지를 따른다).
+- **절대** CP949/UTF-16 파일을 begin 없이 직접 편집하지 않는다.
+- 새 소스에 한글을 넣을 경우 **UTF-8 with BOM** 으로 저장한다(MSVC가 한글을 올바로 인식).
+
+---
+
 ## 1. CHECK 절차 (이 루프의 심장 — 반드시 실행/안내)
 
 > 라이프사이클 매핑: **VERIFY 단계 = 1-1 빌드 + 코드 리뷰**, **TEST 단계 = 1-2 단위 테스트**.
