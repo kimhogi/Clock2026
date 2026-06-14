@@ -13,10 +13,20 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Source) {
-  # 기본: 이 스크립트가 Clock2026/tools/install-khg-skills/ 에 있다고 보고 ..\..\.claude\skills
-  $Source = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) '..\..\.claude\skills'
-  if (-not (Test-Path $Source)) { $Source = (Get-Location).Path }  # zip 풀고 그 안에서 실행하는 경우
+  # khg-mfc 폴더가 실제로 들어있는 위치를 자동탐지:
+  #  1) 스크립트와 같은 폴더(zip을 풀면 install.ps1 옆에 khg-mfc/khg-loop가 있음)
+  #  2) Clock2026 체크아웃의 ..\..\.claude\skills
+  #  3) 현재 작업 폴더
+  $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+  $candidates = @(
+    $scriptDir,
+    (Join-Path $scriptDir '..\..\.claude\skills'),
+    (Get-Location).Path
+  )
+  $Source = $candidates | Where-Object { Test-Path (Join-Path $_ 'khg-mfc') } | Select-Object -First 1
+  if (-not $Source) { throw "khg-mfc/khg-loop 폴더를 찾을 수 없습니다. zip을 푼 폴더에서 실행하거나 -Source 로 경로를 지정하세요." }
 }
+Write-Host "소스: $Source"
 $dest = Join-Path $env:USERPROFILE '.claude\skills'
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 foreach ($s in 'khg-loop','khg-mfc') {

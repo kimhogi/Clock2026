@@ -4,8 +4,13 @@
 #   ./install.sh --commit        # ~/.claude 가 git repo면 커밋까지(동기화 전파)
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-src="$here/../../.claude/skills"
-[ -d "$src" ] || src="$(pwd)"      # zip 풀고 그 안에서 실행하는 경우
+# khg-mfc 폴더가 실제로 있는 위치 자동탐지: 스크립트 옆 -> Clock2026 -> 현재 폴더
+src=""
+for c in "$here" "$here/../../.claude/skills" "$(pwd)"; do
+  if [ -d "$c/khg-mfc" ]; then src="$c"; break; fi
+done
+[ -n "$src" ] || { echo "khg-mfc/khg-loop 폴더를 찾을 수 없습니다." >&2; exit 1; }
+echo "소스: $src"
 dest="$HOME/.claude/skills"
 mkdir -p "$dest"
 for s in khg-loop khg-mfc; do
