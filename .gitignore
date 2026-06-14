@@ -366,4 +366,7 @@ FodyWeavers.xsd
 *.bak.*
 _fix_replaceloop.ps1
 .bkit/
-.claude/
+.claude/*
+# 공유 스킬은 저장소에 포함(로컬 설정 settings.local.json 등은 계속 무시)
+!.claude/skills/
+.claude/settings.local.json
